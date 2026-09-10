@@ -1,4 +1,3 @@
-# Mathematical pendulum modeling using Euler and Runge-Kutta methods
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,12 +8,12 @@ import matplotlib.animation as animation
 gamma = 0
 omega = 1
 
-def d(s):
+def d(s:np.array):
     u = s[0]
     v = s[1]
     return np.array((
         v, 
-        - omega**2*u # - 2*gamma*v - omega**2*np.sin(u)
+        - omega**2*u 
     ))
 
 u_0 = 1
@@ -37,12 +36,10 @@ s_trajectory = np.zeros((steps_number + 1, 2), dtype=np.float32)
 s_trajectory[0] = s_0
 
 time_axes = np.linspace(t_min, t_max, steps_number + 1)
-
-# INTEGRATION_METHODS
-
 def explicit_euler_step(s, delta_t):
     d1 = delta_t * d(s)
     return s + d1
+
 
 def implicit_euler_step(s, delta_t):
     d1 = delta_t * d(s)
@@ -55,12 +52,6 @@ def average_exp_imp_step(s, delta_t):
     d2 = delta_t * d(s + d1)
     return s + (d1 + d2) / 2
 
-def half_point_step(s, delta_t):
-    # RK2
-    d1 = delta_t * d(s)
-    d2 = delta_t * d(s + d1 / 2)
-    return s + d2
-
 def rk4_step(s, delta_t):
     # RK4
     d1 = delta_t * d(s)
@@ -70,9 +61,22 @@ def rk4_step(s, delta_t):
 
     return s + (d1 + 2 * d2 + 2 * d3 + d4) / 6
 
+def test_scheme(s, delta_t):
+
+    u = s[0]
+    v = s[1]
+
+    v_new = v + delta_t*(- omega**2*u )
+    u_new = u + delta_t*v_new
+
+    return np.array([
+        u_new,
+        v_new
+    ])
+
 
 # SIMULATION
-integration_method = rk4_step
+integration_method = test_scheme
 
 for i in range(1, steps_number + 1):
     s_trajectory[i] = integration_method(s_trajectory[i - 1], delta_t)
@@ -81,6 +85,7 @@ u_trajectory = s_trajectory[:, 0]
 v_trajectory = s_trajectory[:, 1]
 
 energy = v_trajectory**2 + omega**2 * 2 * (1 - np.cos(u_trajectory))
+
 
 
 # VISUALIZATION
