@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Домашние задания — жёлтый уровень</title>
+<style>
+body{max-width:1000px;margin:48px auto;padding:0 24px;font:17px/1.6 system-ui;color:#172b3a;background:#fafbf9}
+h1{font-size:36px;line-height:1.2}h2{font-size:23px;margin-top:0}a{color:#145f89}p{max-width:850px}
+.tag{color:#745400;background:#ffed9d;border-radius:8px;padding:5px 12px;font-size:14px}
+.cards{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin:30px 0}
+article{background:white;border:1px solid #dae0df;border-top:5px solid #e1b82d;border-radius:12px;padding:22px}
+article p{font-size:15px}.button{display:inline-block;background:#175c76;color:white;text-decoration:none;padding:8px 14px;border-radius:6px}
+li{margin:8px 0}footer{border-top:1px solid #ddd;margin-top:32px;padding-top:16px;font-size:14px;color:#50606b}
+</style>
+<span class="tag">Практикум · занятие 1 · 🟢 + 🟡</span>
+<h1>Три задачи в действии</h1>
+<p>Выполненные Jupyter notebooks с объяснениями, графиками, проверкой сходимости и восемью анимациями.
+Начните с HTML-просмотра; для изменения параметров откройте соответствующий notebook в Jupyter и выполните все ячейки.</p>
+<div class="cards">
+<article><h2>1.1. Маятник</h2><p>Линейная и нелинейная модели, зависимость периода от амплитуды, два ансамбля.</p>
+<p><strong>6–10 часов</strong> для студента со знанием Python.</p>
+<p><a class="button" href="1.1_pendulum_yellow.html">Смотреть решение</a></p>
+<a href="1.1_pendulum_yellow.ipynb" download>Скачать notebook</a></article>
+<article><h2>1.2. Баллистика</h2><p>Сопротивление воздуха, оптимальный угол, уточнение приземления и силы в полёте.</p>
+<p><strong>7–12 часов</strong> для студента со знанием Python.</p>
+<p><a class="button" href="1.2_ballistics_yellow.html">Смотреть решение</a></p>
+<a href="1.2_ballistics_yellow.ipynb" download>Скачать notebook</a></article>
+<article><h2>1.3. Орбиты</h2><p>Эллипсы, общий период, ошибка возвращения и равные площади за равные времена.</p>
+<p><strong>9–15 часов</strong> для студента со знанием Python.</p>
+<p><a class="button" href="1.3_orbits_yellow.html">Смотреть решение</a></p>
+<a href="1.3_orbits_yellow.ipynb" download>Скачать notebook</a></article>
+</div>
+<h2>Сразу к анимациям</h2>
+<ol>
+<li><a href="animations/1.1_comparison.html">Линейный и нелинейный маятники: движение и фазовая плоскость</a></li>
+<li><a href="animations/1.1_lengths.html">Десять маятников с соизмеримыми частотами</a></li>
+<li><a href="animations/1.1_amplitudes.html">Десять маятников с разными амплитудами</a></li>
+<li><a href="animations/1.2_vectors.html">Бросок: след, скорость, тяжесть и сопротивление</a></li>
+<li><a href="animations/1.2_ensemble.html">Одновременный запуск десяти тел в двух средах</a></li>
+<li><a href="animations/1.3_methods.html">Орбита: Эйлер и RK4 в один момент времени</a></li>
+<li><a href="animations/1.3_ensemble.html">Десять эллипсов с общей большой полуосью</a></li>
+<li><a href="animations/1.3_sectors.html">Закон площадей и график скорости</a></li>
+</ol>
+<p>Нажмите ▶ под картинкой. Ползунок позволяет выбрать кадр; «Loop» включает повтор.
+Скорость воспроизведения условная, физическое время подписано на рисунке.</p>
+<footer>Все три ноутбука выполнены в настоящем ядре Jupyter; численные проверки пройдены.
+Оценки трудоёмкости экспертные, не получены из наблюдений за студентами.
+Подробности запуска и методические замечания: <a href="README.md">README</a>.</footer>
+</html>

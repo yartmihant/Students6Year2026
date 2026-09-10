@@ -1,0 +1,217 @@
+{
+  "main": {
+    "id": "cbc82021ed2591ac",
+    "type": "split",
+    "children": [
+      {
+        "id": "572ea5ed73ac93b1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "81b3aef259cc80be",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "README.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "README"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "8a5722296405118a",
+    "type": "split",
+    "children": [
+      {
+        "id": "6fbdabee00eb12a8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "96580a54e9bbfaeb",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "f3d5efa01a81409f",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "e27e316b81983bdb",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "0ffe49e4fc6ba472",
+    "type": "split",
+    "children": [
+      {
+        "id": "45784422ca123aab",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "24a89033498c15e3",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "README.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки"
+            }
+          },
+          {
+            "id": "15947db922d6cef3",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "README.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки"
+            }
+          },
+          {
+            "id": "335aafb60c316d16",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "5522d03b7cb1d74a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Все свойства"
+            }
+          },
+          {
+            "id": "e22e24309d0f9061",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "README.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false
+    }
+  },
+  "active": "81b3aef259cc80be",
+  "lastOpenFiles": [
+    "lesson1/yellow_homework/tools/__pycache__/execute_notebooks.cpython-313.pyc",
+    "lesson1/yellow_homework/tools/__pycache__",
+    "lesson1/yellow_homework/tools/execute_notebooks.py",
+    "lesson1/yellow_homework/tools/check_artifacts.py",
+    "lesson1/yellow_homework/previews/1.3_orbits_yellow_2.png",
+    "lesson1/yellow_homework/tools/build_notebooks.py",
+    "lesson1/yellow_homework/previews/animation_contact_sheet.jpg",
+    "lesson1/yellow_homework/previews/1.3_orbits_yellow_3.png",
+    "lesson1/yellow_homework/previews/1.3_orbits_yellow_1.png",
+    "lesson1/yellow_homework/previews/1.2_ballistics_yellow_2.png",
+    "lesson1/yellow_homework/previews/1.2_ballistics_yellow_3.png",
+    "lesson1/yellow_homework/previews/1.2_ballistics_yellow_1.png",
+    "lesson1/yellow_homework/previews/1.1_pendulum_yellow_3.png",
+    "lesson1/yellow_homework/animations/1.3_sectors.html",
+    "lesson1/yellow_homework/previews/1.1_pendulum_yellow_2.png",
+    "lesson1/yellow_homework/animations/1.3_methods.html",
+    "lesson1/yellow_homework/previews/1.1_pendulum_yellow_1.png",
+    "lesson1/yellow_homework/animations/1.3_ensemble.html",
+    "lesson1/yellow_homework/animations/1.2_vectors.html",
+    "lesson1/yellow_homework/animations/1.2_ensemble.html",
+    "lesson1/yellow_homework/animations/1.1_lengths.html",
+    "lesson1/yellow_homework/README.md",
+    "yellow_homework/README.md"
+  ]
+}

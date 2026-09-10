@@ -1,0 +1,317 @@
+<!doctype html><html lang="ru"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.3_orbits_yellow</title>
+<style>body{max-width:1180px;margin:32px auto;padding:0 20px;font:16px/1.55 system-ui;color:#182432}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5f7;padding:16px;font:13px/1.45 monospace}img{max-width:100%;height:auto}table{border-collapse:collapse;font-size:14px}td,th{padding:6px 12px;border:1px solid #ccd4dc}h1,h2{line-height:1.25}.output{margin:16px 0}details{margin:18px 0}summary{cursor:pointer;color:#225e91}iframe{width:100%;height:570px;border:1px solid #ddd}.markdown{font:inherit}</style>
+<p><a href="index.html">← Все задания</a></p>
+<p>Расчёты уже выполнены. Код раскрывается нажатием. Анимации работают без сети. Математические формулы в этой HTML-копии сохранены в записи LaTeX; для их набора откройте исходный notebook в Jupyter.</p>
+<h1>1.3. Орбитальное движение в 2D — 🟢 + 🟡</h1>
+<p>Безразмерные переменные, гравитационный параметр $\mu=1$, масса пробного тела 1. Состояние $s=(x,y,v_x,v_y)$, ускорение $-\mathbf r/r^3$. Сначала проверяем круговую орбиту, затем исследуем эллипсы с <strong>одинаковой</strong> большой полуосью $a=1$ и эксцентриситетами от 0 до 0.8. Все тела независимы: между собой не взаимодействуют, центр неподвижен.</p>
+<p>Все ячейки выполняются сверху вниз. Для воспроизведения анимаций используйте ▶.</p>
+<details><summary>Код Python</summary><pre>import time
+import re
+from pathlib import Path
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from IPython.display import display, HTML, Markdown
+from IPython import get_ipython
+from scipy.optimize import brentq
+
+get_ipython().run_line_magic(&#x27;matplotlib&#x27;, &#x27;inline&#x27;)
+started = time.perf_counter()
+plt.rcParams.update({&#x27;figure.dpi&#x27;: 90, &#x27;font.size&#x27;: 10,
+                     &#x27;axes.grid&#x27;: True, &#x27;animation.embed_limit&#x27;: 50})
+COLORS = plt.cm.viridis(np.linspace(0.08, 0.92, 10))
+
+def step(rhs, state, h, method=&#x27;RK4&#x27;):
+    &quot;&quot;&quot;Явный Эйлер или классический RK4 для автономной системы.&quot;&quot;&quot;
+    k1 = rhs(state)
+    if method == &#x27;Euler&#x27;:
+        return state + h*k1
+    if method != &#x27;RK4&#x27;:
+        raise ValueError(method)
+    k2 = rhs(state + h*k1/2)
+    k3 = rhs(state + h*k2/2)
+    k4 = rhs(state + h*k3)
+    return state + h*(k1 + 2*k2 + 2*k3 + k4)/6
+
+def integrate(rhs, initial, duration, h, method=&#x27;RK4&#x27;):
+    # Последний момент точно равен duration; фактический шаг не больше h.
+    n = int(np.ceil(duration/h))
+    t = np.linspace(0, duration, n+1)
+    y = np.empty((n+1, len(initial)))
+    y[0] = initial
+    for j in range(n):
+        y[j+1] = step(rhs, y[j], t[j+1]-t[j], method)
+    return t, y
+
+def sample(t, y, times):
+    &quot;&quot;&quot;Интерполяция только для кадров; ошибки считаются на расчётной сетке.&quot;&quot;&quot;
+    return np.column_stack([np.interp(times, t, y[:, j]) for j in range(y.shape[1])])
+
+def table(headers, rows):
+    escaped = lambda values: [str(value).replace(&#x27;|&#x27;, &#x27;&amp;#124;&#x27;) for value in values]
+    display(Markdown(&#x27;| &#x27; + &#x27; | &#x27;.join(escaped(headers)) + &#x27; |\n| &#x27; +
+                     &#x27; | &#x27;.join([&#x27;---&#x27;]*len(headers)) + &#x27; |\n&#x27; +
+                     &#x27;\n&#x27;.join(&#x27;| &#x27; + &#x27; | &#x27;.join(escaped(row)) + &#x27; |&#x27; for row in rows)))
+
+def show_animation(fig, update, frames, filename):
+    # Кадры встроены: работают без ffmpeg, сети и дополнительных виджетов.
+    movie = FuncAnimation(fig, update, frames=frames, interval=70, blit=False)
+    html = movie.to_jshtml(default_mode=&#x27;once&#x27;)
+    # Matplotlib использует внешний шрифт для значков; заменяем локальным текстом.
+    html = re.sub(r&#x27;&lt;link\s+rel=&quot;stylesheet&quot;\s+href=&quot;[^&quot;]+&quot;&gt;&#x27;, &#x27;&#x27;, html)
+    icons = {&#x27;fa-minus&#x27;: &#x27;−&#x27;, &#x27;fa-plus&#x27;: &#x27;+&#x27;, &#x27;fa-fast-backward&#x27;: &#x27;⏮&#x27;,
+             &#x27;fa-backward&#x27;: &#x27;◀|&#x27;, &#x27;fa-step-backward&#x27;: &#x27;|◀&#x27;, &#x27;fa-play&#x27;: &#x27;▶&#x27;,
+             &#x27;fa-play fa-flip-horizontal&#x27;: &#x27;◀&#x27;, &#x27;fa-step-forward&#x27;: &#x27;▶|&#x27;, &#x27;fa-pause&#x27;: &#x27;Ⅱ&#x27;,
+             &#x27;fa-stop&#x27;: &#x27;■&#x27;, &#x27;fa-forward&#x27;: &#x27;|▶&#x27;, &#x27;fa-fast-forward&#x27;: &#x27;⏭&#x27;,
+             &#x27;fa-refresh&#x27;: &#x27;↻&#x27;}
+    html = re.sub(r&#x27;&lt;i class=&quot;fa ([^&quot;]+)&quot;[^&gt;]*&gt;&lt;/i&gt;&#x27;,
+                  lambda match: icons.get(match[1], match[1].removeprefix(&#x27;fa-&#x27;)), html)
+    plt.close(fig)
+    out = Path(&#x27;animations&#x27;)
+    out.mkdir(exist_ok=True)
+    (out/filename).write_text(&#x27;&lt;!doctype html&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&#x27; + html, encoding=&#x27;utf-8&#x27;)
+    display(HTML(html))
+</pre></details>
+<details><summary>Код Python</summary><pre>mu, a = 1., 1.
+T = 2*np.pi*np.sqrt(a**3/mu)
+
+def gravity(s):
+    r = np.linalg.norm(s[:2])
+    return np.r_[s[2:], -mu*s[:2]/r**3]
+
+def orbit_initial(e):
+    return np.array([a*(1-e), 0., 0., np.sqrt(mu/a*(1+e)/(1-e))])
+
+def invariants(s):
+    energy = np.sum(s[:, 2:]**2, axis=1)/2-mu/np.linalg.norm(s[:, :2], axis=1)
+    angular_momentum = s[:, 0]*s[:, 3]-s[:, 1]*s[:, 2]
+    return energy, angular_momentum
+
+def exact_orbit(t, e):
+    # Уравнение Кеплера E-e sin E=M решаем Ньютоном; e&lt;=0.8 в опытах ниже.
+    M = np.asarray(t)*np.sqrt(mu/a**3)
+    E = M.copy()
+    for _ in range(40):
+        correction = (E-e*np.sin(E)-M)/(1-e*np.cos(E))
+        E -= correction
+        if np.max(np.abs(correction)) &lt; 1e-13:
+            break
+    assert np.max(np.abs(E-e*np.sin(E)-M)) &lt; 1e-11
+    factor = np.sqrt(mu/a**3)/(1-e*np.cos(E))
+    return np.column_stack([a*(np.cos(E)-e), a*np.sqrt(1-e**2)*np.sin(E),
+                            -a*np.sin(E)*factor, a*np.sqrt(1-e**2)*np.cos(E)*factor])
+</pre></details>
+<h2>1. Круговая орбита: проверка двух методов</h2>
+<p>При $(x,y,v_x,v_y)=(1,0,0,1)$ точное положение равно $(\cos t,\sin t)$. Удельная энергия $E=|v|^2/2-1/r=-1/2$, момент импульса $L_z=xv_y-yv_x=1$. Сравниваем орбиты и инварианты за два оборота. В таблице максимум ошибки положения относительно точного решения, а не только ошибка в последнем узле.</p>
+<details><summary>Код Python</summary><pre>fig, ax = plt.subplots(1, 3, figsize=(13, 3.6))
+rows, errors = [], {}
+for method in [&#x27;Euler&#x27;, &#x27;RK4&#x27;]:
+    errors[method] = []
+    for n in [100, 200, 400, 800]:
+        t, s = integrate(gravity, orbit_initial(0), 2*T, T/n, method)
+        err = np.max(np.linalg.norm(s[:, :2]-exact_orbit(t, 0)[:, :2], axis=1))
+        errors[method].append(err); rows.append([method, f&#x27;T/{n}&#x27;, f&#x27;{err:.3e}&#x27;])
+    t, s = integrate(gravity, orbit_initial(0), 2*T, T/400, method)
+    E, J = invariants(s)
+    ax[0].plot(s[:, 0], s[:, 1], label=method)
+    ax[1].plot(t/T, E, label=method); ax[2].plot(t/T, J, label=method)
+exact = exact_orbit(np.linspace(0, T, 600), 0)
+ax[0].plot(exact[:, 0], exact[:, 1], &#x27;k--&#x27;, label=&#x27;Точно&#x27;)
+ax[0].plot(0, 0, &#x27;k*&#x27;); ax[0].set(xlabel=&#x27;x&#x27;, ylabel=&#x27;y&#x27;, aspect=&#x27;equal&#x27;)
+ax[1].axhline(-.5, color=&#x27;k&#x27;, ls=&#x27;--&#x27;); ax[1].set(xlabel=&#x27;t / T&#x27;, ylabel=&#x27;E&#x27;)
+ax[2].axhline(1, color=&#x27;k&#x27;, ls=&#x27;--&#x27;); ax[2].set(xlabel=&#x27;t / T&#x27;, ylabel=&#x27;Lz&#x27;)
+for panel in ax: panel.legend()
+fig.tight_layout(); display(fig); plt.close(fig)
+table([&#x27;Метод&#x27;, &#x27;Шаг&#x27;, &#x27;max ошибка положения&#x27;], rows)
+assert errors[&#x27;RK4&#x27;][-2]/errors[&#x27;RK4&#x27;][-1] &gt; 12
+assert errors[&#x27;Euler&#x27;][-1] &lt; errors[&#x27;Euler&#x27;][0]
+</pre></details>
+<div class="output"><img src="previews/1.3_orbits_yellow_1.png"></div>
+<table><tr><th>Метод</th><th>Шаг</th><th>max ошибка положения</th></tr><tr><td>Euler</td><td>T/100</td><td>2.764e+00</td></tr><tr><td>Euler</td><td>T/200</td><td>2.419e+00</td></tr><tr><td>Euler</td><td>T/400</td><td>2.165e+00</td></tr><tr><td>Euler</td><td>T/800</td><td>1.454e+00</td></tr><tr><td>RK4</td><td>T/100</td><td>7.706e-06</td></tr><tr><td>RK4</td><td>T/200</td><td>3.811e-07</td></tr><tr><td>RK4</td><td>T/400</td><td>2.068e-08</td></tr><tr><td>RK4</td><td>T/800</td><td>1.200e-09</td></tr></table>
+<h2>2. Эллипсы с общей большой полуосью</h2>
+<p>Старт из перицентра: $r_p=a(1-e)$, $v_p=\sqrt{(1+e)/(a(1-e))}$. Аналитическая форма: $x=a(\cos E-e)$, $y=a\sqrt{1-e^2}\sin E$, где эксцентрическая аномалия $E$ связана со временем уравнением Кеплера $E-e\sin E=\sqrt{1/a^3}\,t$. Для всех эксцентриситетов $T=2\pi a^{3/2}$.</p>
+<p>Численный период измерим по следующему пересечению $y=0$ снизу вверх при $x&gt;0$, уточнив событие внутри шага RK4. Это измерение периода не использует возвращение по готовой формуле времени. При $e=0$ пересечение служит той же меткой фазы.</p>
+<details><summary>Код Python</summary><pre>eccentricities = [0., .3, .6, .8]
+fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+rows = []
+for e in eccentricities:
+    t, s = integrate(gravity, orbit_initial(e), 1.15*T, T/4000)
+    indices = np.flatnonzero((s[:-1, 1] &lt; 0) &amp; (s[1:, 1] &gt;= 0) &amp; (s[1:, 0] &gt; 0))
+    j = indices[0]
+    dt = brentq(lambda dt: step(gravity, s[j], dt)[1], 0, t[j+1]-t[j], xtol=1e-14)
+    measured = t[j]+dt
+    exact = exact_orbit(t, e)
+    line, = ax[0].plot(s[:, 0], s[:, 1], label=f&#x27;e={e:g}, RK4&#x27;)
+    ax[0].plot(exact[:, 0], exact[:, 1], &#x27;--&#x27;, color=line.get_color(), alpha=.6)
+    ax[1].plot(t/T, np.linalg.norm(s[:, 2:], axis=1), label=f&#x27;e={e:g}&#x27;)
+    shape_error = np.max(np.abs((s[:, 0]+a*e)**2/a**2+s[:, 1]**2/(a*a*(1-e*e))-1))
+    rows.append([e, f&#x27;{measured:.9f}&#x27;, f&#x27;{abs(measured/T-1):.3e}&#x27;, f&#x27;{shape_error:.3e}&#x27;])
+    assert abs(measured/T-1) &lt; 2e-6
+    assert shape_error &lt; 2e-5
+ax[0].plot(0, 0, &#x27;k*&#x27;); ax[0].set(xlabel=&#x27;x&#x27;, ylabel=&#x27;y&#x27;, aspect=&#x27;equal&#x27;, title=&#x27;Сплошная: RK4; штриховая: точно&#x27;)
+ax[1].set(xlabel=&#x27;t / T&#x27;, ylabel=&#x27;|v|&#x27;, title=&#x27;Распределение скорости&#x27;)
+for panel in ax: panel.legend(fontsize=8)
+fig.tight_layout(); display(fig); plt.close(fig)
+table([&#x27;e&#x27;, &#x27;Численный период&#x27;, &#x27;|T_h/T−1|&#x27;, &#x27;max невязка уравнения эллипса&#x27;], rows)
+print(f&#x27;Аналитический период для всех e: {T:.9f}&#x27;)
+</pre></details>
+<div class="output"><img src="previews/1.3_orbits_yellow_2.png"></div>
+<table><tr><th>e</th><th>Численный период</th><th>|T_h/T−1|</th><th>max невязка уравнения эллипса</th></tr><tr><td>0.0</td><td>6.283185307</td><td>1.483e-13</td><td>3.916e-13</td></tr><tr><td>0.3</td><td>6.283185307</td><td>7.215e-13</td><td>4.882e-12</td></tr><tr><td>0.6</td><td>6.283185307</td><td>5.999e-11</td><td>2.776e-10</td></tr><tr><td>0.8</td><td>6.283185241</td><td>1.061e-08</td><td>3.656e-08</td></tr></table>
+<pre>Аналитический период для всех e: 6.283185307
+</pre>
+<h2>3. Ошибка возвращения через точный период и уменьшение шага</h2>
+<p>Считаем $\|\mathbf r_h(T)-\mathbf r(0)\|$ строго в момент $T$, без интерполяции между соседними узлами: шаг равен $T/N$. Для Эйлера и RK4 используем одну сетку. Ошибка возвращения объединяет ошибки формы и фазы; сама по себе она не заменяет проверку траектории и периода из предыдущего раздела.</p>
+<details><summary>Код Python</summary><pre>ns = np.array([250, 500, 1000, 2000])
+fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
+rows, return_errors = [], {}
+for panel, method in zip(ax, [&#x27;Euler&#x27;, &#x27;RK4&#x27;]):
+    for e in eccentricities:
+        errs = []
+        for n in ns:
+            ti, si = integrate(gravity, orbit_initial(e), T, T/n, method)
+            err = np.linalg.norm(si[-1, :2]-si[0, :2])
+            errs.append(err)
+            rows.append([method, e, int(n), f&#x27;{err:.3e}&#x27;])
+        return_errors[(method, e)] = errs
+        panel.loglog(T/ns, errs, &#x27;o-&#x27;, label=f&#x27;e={e:g}&#x27;)
+    panel.set(title=method, xlabel=&#x27;Шаг h&#x27;, ylabel=&#x27;Ошибка возвращения&#x27;); panel.legend()
+    panel.set_xticks(T/ns, [f&#x27;{h:.4f}&#x27; for h in T/ns]); panel.xaxis.set_minor_formatter(plt.NullFormatter())
+fig.tight_layout(); display(fig); plt.close(fig)
+table([&#x27;Метод&#x27;, &#x27;e&#x27;, &#x27;Шагов за T&#x27;, &#x27;Ошибка возвращения&#x27;], rows)
+for e in eccentricities:
+    errs = return_errors[(&#x27;RK4&#x27;, e)]
+    assert errs[-1] &lt; errs[0]/100
+    assert errs[-2]/errs[-1] &gt; 12
+table([&#x27;e&#x27;, &#x27;v в перицентре&#x27;, &#x27;v в апоцентре&#x27;, &#x27;v_p / v_a&#x27;, &#x27;r_p / v_p&#x27;],
+      [[e, f&#x27;{np.sqrt((1+e)/(1-e)):.3f}&#x27;, f&#x27;{np.sqrt((1-e)/(1+e)):.3f}&#x27;,
+        f&#x27;{(1+e)/(1-e):.1f}&#x27;, f&#x27;{(1-e)**1.5/np.sqrt(1+e):.4f}&#x27;] for e in eccentricities])
+display(Markdown(&#x27;**Ответ:** в перицентре тело движется быстрее, в апоцентре медленнее. &#x27;
+                 &#x27;При e=0.8 отношение скоростей равно 9. Локальное время прохождения &#x27;
+                 &#x27;перицентра rₚ/vₚ уменьшается примерно в 15 раз относительно круга. &#x27;
+                 &#x27;Поэтому одинаковое число шагов за период хуже разрешает вытянутую орбиту; &#x27;
+                 &#x27;при постоянном шаге его следует выбирать по быстрому движению у перицентра.&#x27;))
+</pre></details>
+<div class="output"><img src="previews/1.3_orbits_yellow_3.png"></div>
+<table><tr><th>Метод</th><th>e</th><th>Шагов за T</th><th>Ошибка возвращения</th></tr><tr><td>Euler</td><td>0.0</td><td>250</td><td>1.206e+00</td></tr><tr><td>Euler</td><td>0.0</td><td>500</td><td>6.759e-01</td></tr><tr><td>Euler</td><td>0.0</td><td>1000</td><td>3.585e-01</td></tr><tr><td>Euler</td><td>0.0</td><td>2000</td><td>1.847e-01</td></tr><tr><td>Euler</td><td>0.3</td><td>250</td><td>1.886e+00</td></tr><tr><td>Euler</td><td>0.3</td><td>500</td><td>1.147e+00</td></tr><tr><td>Euler</td><td>0.3</td><td>1000</td><td>6.330e-01</td></tr><tr><td>Euler</td><td>0.3</td><td>2000</td><td>3.290e-01</td></tr><tr><td>Euler</td><td>0.6</td><td>250</td><td>3.756e+00</td></tr><tr><td>Euler</td><td>0.6</td><td>500</td><td>2.561e+00</td></tr><tr><td>Euler</td><td>0.6</td><td>1000</td><td>1.687e+00</td></tr><tr><td>Euler</td><td>0.6</td><td>2000</td><td>1.054e+00</td></tr><tr><td>Euler</td><td>0.8</td><td>250</td><td>9.056e+00</td></tr><tr><td>Euler</td><td>0.8</td><td>500</td><td>6.302e+00</td></tr><tr><td>Euler</td><td>0.8</td><td>1000</td><td>4.338e+00</td></tr><tr><td>Euler</td><td>0.8</td><td>2000</td><td>2.935e+00</td></tr><tr><td>RK4</td><td>0.0</td><td>250</td><td>6.569e-08</td></tr><tr><td>RK4</td><td>0.0</td><td>500</td><td>3.848e-09</td></tr><tr><td>RK4</td><td>0.0</td><td>1000</td><td>2.325e-10</td></tr><tr><td>RK4</td><td>0.0</td><td>2000</td><td>1.428e-11</td></tr><tr><td>RK4</td><td>0.3</td><td>250</td><td>4.995e-07</td></tr><tr><td>RK4</td><td>0.3</td><td>500</td><td>2.797e-08</td></tr><tr><td>RK4</td><td>0.3</td><td>1000</td><td>1.648e-09</td></tr><tr><td>RK4</td><td>0.3</td><td>2000</td><td>9.994e-11</td></tr><tr><td>RK4</td><td>0.6</td><td>250</td><td>6.928e-05</td></tr><tr><td>RK4</td><td>0.6</td><td>500</td><td>3.660e-06</td></tr><tr><td>RK4</td><td>0.6</td><td>1000</td><td>2.082e-07</td></tr><tr><td>RK4</td><td>0.6</td><td>2000</td><td>1.238e-08</td></tr><tr><td>RK4</td><td>0.8</td><td>250</td><td>2.595e-02</td></tr><tr><td>RK4</td><td>0.8</td><td>500</td><td>1.191e-03</td></tr><tr><td>RK4</td><td>0.8</td><td>1000</td><td>6.102e-05</td></tr><tr><td>RK4</td><td>0.8</td><td>2000</td><td>3.402e-06</td></tr></table>
+<table><tr><th>e</th><th>v в перицентре</th><th>v в апоцентре</th><th>v_p / v_a</th><th>r_p / v_p</th></tr><tr><td>0.0</td><td>1.000</td><td>1.000</td><td>1.0</td><td>1.0000</td></tr><tr><td>0.3</td><td>1.363</td><td>0.734</td><td>1.9</td><td>0.5137</td></tr><tr><td>0.6</td><td>2.000</td><td>0.500</td><td>4.0</td><td>0.2000</td></tr><tr><td>0.8</td><td>3.000</td><td>0.333</td><td>9.0</td><td>0.0667</td></tr></table>
+<p><strong>Ответ:</strong> в перицентре тело движется быстрее, в апоцентре медленнее. При e=0.8 отношение скоростей равно 9. Локальное время прохождения перицентра rₚ/vₚ уменьшается примерно в 15 раз относительно круга. Поэтому одинаковое число шагов за период хуже разрешает вытянутую орбиту; при постоянном шаге его следует выбирать по быстрому движению у перицентра.</p>
+<h2>4. Эйлер и RK4: две панели, один момент времени</h2>
+<p>Выбран e=0.6, одинаковый шаг T/2000. Штриховой линией показана точная форма, пустым кружком — точное положение в текущий момент. След позволяет увидеть ошибку формы, разность положений — ошибку фазы. Масштаб панелей общий.</p>
+<details><summary>Код Python</summary><pre>e_selected = .6
+frames = np.linspace(0, T, 111)
+motion = []
+for method in [&#x27;Euler&#x27;, &#x27;RK4&#x27;]:
+    ti, si = integrate(gravity, orbit_initial(e_selected), T, T/2000, method)
+    motion.append(sample(ti, si, frames))
+reference = exact_orbit(frames, e_selected)
+outline = exact_orbit(np.linspace(0, T, 800), e_selected)
+fig, ax = plt.subplots(1, 2, figsize=(9, 4), dpi=75, sharex=True, sharey=True)
+artists = []
+all_positions = np.vstack([s[:, :2] for s in motion]+[outline[:, :2]])
+lo, hi = all_positions.min(axis=0)-.15, all_positions.max(axis=0)+.15
+for panel, method in zip(ax, [&#x27;Euler&#x27;, &#x27;RK4&#x27;]):
+    panel.plot(outline[:, 0], outline[:, 1], &#x27;k--&#x27;, label=&#x27;Точный эллипс&#x27;)
+    panel.plot(0, 0, &#x27;k*&#x27;)
+    trail, = panel.plot([], [], color=&#x27;tab:blue&#x27;)
+    dot, = panel.plot([], [], &#x27;o&#x27;, color=&#x27;tab:blue&#x27;, label=method)
+    exact_dot, = panel.plot([], [], &#x27;o&#x27;, mfc=&#x27;none&#x27;, mec=&#x27;tab:red&#x27;, ms=8, label=&#x27;Точное положение&#x27;)
+    artists.append((trail, dot, exact_dot))
+    panel.set(xlim=(lo[0], hi[0]), ylim=(lo[1], hi[1]), aspect=&#x27;equal&#x27;, xlabel=&#x27;x&#x27;, ylabel=&#x27;y&#x27;, title=method)
+    panel.legend(fontsize=8)
+title = fig.suptitle(&#x27;&#x27;); fig.tight_layout()
+def update(j):
+    for s, (trail, dot, exact_dot) in zip(motion, artists):
+        trail.set_data(s[:j+1, 0], s[:j+1, 1]); dot.set_data([s[j, 0]], [s[j, 1]])
+        exact_dot.set_data([reference[j, 0]], [reference[j, 1]])
+    title.set_text(f&#x27;e=0.6, h=T/2000, t/T={frames[j]/T:.3f}&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.3_methods.html&#x27;)
+</pre></details>
+<iframe loading="lazy" src="animations/1.3_methods.html"></iframe>
+<h2>5. Десять орбит с разными эксцентриситетами</h2>
+<p>Одинаковая большая полуось a=1 и общий период T. Все тела стартуют из своих перицентров при t=0. Для движения используется RK4 с шагом T/4000, для формы — аналитические эллипсы. Быстрые участки находятся около общего притягивающего центра.</p>
+<details><summary>Код Python</summary><pre>es = np.linspace(0, .8, 10)
+frames = np.linspace(0, T, 121)
+motions = []
+fig, ax = plt.subplots(figsize=(7, 4.5), dpi=75)
+dots = []
+for e, color in zip(es, COLORS):
+    ti, si = integrate(gravity, orbit_initial(e), T, T/4000)
+    motions.append(sample(ti, si, frames))
+    outline = exact_orbit(np.linspace(0, T, 800), e)
+    ax.plot(outline[:, 0], outline[:, 1], color=color, alpha=.4, lw=1)
+    dots.append(ax.plot([], [], &#x27;o&#x27;, color=color, label=f&#x27;e={e:.2f}&#x27;)[0])
+ax.plot(0, 0, &#x27;k*&#x27;, ms=12)
+ax.set(xlim=(-1.95, 1.15), ylim=(-1.15, 1.15), aspect=&#x27;equal&#x27;, xlabel=&#x27;x&#x27;, ylabel=&#x27;y&#x27;)
+ax.legend(loc=&#x27;center left&#x27;, bbox_to_anchor=(1.01, .5), fontsize=8)
+title = ax.set_title(&#x27;Ten elliptical orbits&#x27;); fig.tight_layout()
+def update(j):
+    for s, dot in zip(motions, dots): dot.set_data([s[j, 0]], [s[j, 1]])
+    title.set_text(f&#x27;Общий период, t/T = {frames[j]/T:.3f}&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.3_ensemble.html&#x27;)
+</pre></details>
+<iframe loading="lazy" src="animations/1.3_ensemble.html"></iframe>
+<h2>6. Равные площади за равные времена</h2>
+<p>Разделим период на 12 равных интервалов. Сектор — область между двумя радиусами-векторами и дугой орбиты, а не круговой сектор с постоянным радиусом. Теоретическая площадь каждого $S_i=\pi a^2\sqrt{1-e^2}/12$, поскольку $dS/dt=L_z/2$. Проверяем площади по <strong>численной траектории RK4</strong> формулой площади многоугольника с вершиной в центре притяжения. Затем показываем постепенное закрашивание этих же секторов; справа численная скорость и общий указатель времени.</p>
+<details><summary>Код Python</summary><pre>from matplotlib.patches import Polygon
+
+sectors, points_per_sector = 12, 600
+ti, si = integrate(gravity, orbit_initial(e_selected), T, T/(sectors*points_per_sector))
+expected_area = np.pi*a*a*np.sqrt(1-e_selected**2)/sectors
+areas = []
+for k in range(sectors):
+    part = si[k*points_per_sector:(k+1)*points_per_sector+1, :2]
+    areas.append(abs(np.sum(part[:-1, 0]*part[1:, 1]-part[1:, 0]*part[:-1, 1]))/2)
+table([&#x27;Сектор&#x27;, &#x27;Площадь по RK4&#x27;, &#x27;Относительная ошибка к теории&#x27;],
+      [[j+1, f&#x27;{area:.8f}&#x27;, f&#x27;{abs(area/expected_area-1):.3e}&#x27;] for j, area in enumerate(areas)])
+assert max(abs(np.array(areas)/expected_area-1)) &lt; 2e-5
+
+fig, ax = plt.subplots(1, 2, figsize=(10, 4), dpi=75)
+ax[0].plot(si[:, 0], si[:, 1], &#x27;k-&#x27;, lw=1)
+ax[0].plot(0, 0, &#x27;k*&#x27;)
+patches = []
+for k in range(sectors):
+    patch = Polygon(np.zeros((3, 2)), facecolor=plt.cm.tab20(k), alpha=.65)
+    ax[0].add_patch(patch); patches.append(patch)
+radius, = ax[0].plot([], [], &#x27;k-&#x27;, lw=1)
+body, = ax[0].plot([], [], &#x27;ko&#x27;)
+ax[0].set(xlim=(-1.8, .6), ylim=(-1, 1), aspect=&#x27;equal&#x27;, xlabel=&#x27;x&#x27;, ylabel=&#x27;y&#x27;)
+speed = np.linalg.norm(si[:, 2:], axis=1)
+ax[1].plot(ti/T, speed, color=&#x27;tab:blue&#x27;)
+for boundary in np.linspace(0, 1, sectors+1): ax[1].axvline(boundary, color=&#x27;gray&#x27;, lw=.5)
+cursor = ax[1].axvline(0, color=&#x27;red&#x27;); dot, = ax[1].plot([], [], &#x27;ro&#x27;)
+ax[1].set(xlabel=&#x27;t / T&#x27;, ylabel=&#x27;|v|&#x27;, xlim=(0, 1))
+title = fig.suptitle(&#x27;&#x27;); fig.tight_layout()
+indices = np.linspace(0, len(ti)-1, 121).round().astype(int)
+def update(j):
+    idx = indices[j]
+    for k, patch in enumerate(patches):
+        start, stop = k*points_per_sector, min(idx, (k+1)*points_per_sector)
+        patch.set_visible(stop &gt; start)
+        if stop &gt; start: patch.set_xy(np.vstack([[0, 0], si[start:stop+1, :2], [0, 0]]))
+    radius.set_data([0, si[idx, 0]], [0, si[idx, 1]])
+    body.set_data([si[idx, 0]], [si[idx, 1]])
+    cursor.set_xdata([ti[idx]/T]*2); dot.set_data([ti[idx]/T], [speed[idx]])
+    title.set_text(f&#x27;e=0.6, t/T={ti[idx]/T:.3f}; Δt=T/12, S≈{expected_area:.4f}&#x27;)
+show_animation(fig, update, len(indices), &#x27;1.3_sectors.html&#x27;)
+</pre></details>
+<table><tr><th>Сектор</th><th>Площадь по RK4</th><th>Относительная ошибка к теории</th></tr><tr><td>1</td><td>0.20943928</td><td>1.090e-06</td></tr><tr><td>2</td><td>0.20943947</td><td>2.031e-07</td></tr><tr><td>3</td><td>0.20943949</td><td>7.927e-08</td></tr><tr><td>4</td><td>0.20943950</td><td>4.761e-08</td></tr><tr><td>5</td><td>0.20943950</td><td>3.593e-08</td></tr><tr><td>6</td><td>0.20943950</td><td>3.163e-08</td></tr><tr><td>7</td><td>0.20943950</td><td>3.163e-08</td></tr><tr><td>8</td><td>0.20943950</td><td>3.593e-08</td></tr><tr><td>9</td><td>0.20943950</td><td>4.761e-08</td></tr><tr><td>10</td><td>0.20943949</td><td>7.927e-08</td></tr><tr><td>11</td><td>0.20943947</td><td>2.031e-07</td></tr><tr><td>12</td><td>0.20943928</td><td>1.090e-06</td></tr></table>
+<iframe loading="lazy" src="animations/1.3_sectors.html"></iframe>
+<h2>Выводы и оценка сложности</h2>
+<ul>
+<li>При фиксированной большой полуоси период не зависит от эксцентриситета.</li>
+<li>Скорость максимальна в перицентре; с ростом e на этот участок приходится всё меньше времени.</li>
+<p>Постоянный шаг нужно уменьшать, что подтверждают ошибки возвращения.</p>
+<li>Явный Эйлер заметно искажает орбиту и инварианты. RK4 существенно точнее на тех же шагах,</li>
+<p>но это наблюдение на нескольких оборотах, а не утверждение о долговременной точности.</p>
+<li>Равные площади за равные времена согласуются с постоянством момента импульса.</li>
+<li>Самые сложные этапы: согласованные начальные условия при разных e, независимый</li>
+<p>расчёт периода, уравнение Кеплера и правильное построение заметённых секторов.</p>
+</ul>
+<p><strong>Оценка для студента:</strong> 9–15 часов со знанием Python и механики; 15–24 часа при первом опыте NumPy/Matplotlib. Это наиболее трудоёмкая из трёх работ, главным образом из-за аналитического эталона и третьей анимации. Уравнение Кеплера нужно здесь для точного положения во времени; для наложения одной только формы достаточно параметрического эллипса.</p>
+<details><summary>Код Python</summary><pre>print(f&#x27;Все численные проверки пройдены. Полное выполнение: {time.perf_counter()-started:.1f} с.&#x27;)
+</pre></details>
+<pre>Все численные проверки пройдены. Полное выполнение: 26.8 с.
+</pre>
+</html>

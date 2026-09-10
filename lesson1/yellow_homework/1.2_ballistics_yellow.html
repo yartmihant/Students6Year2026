@@ -1,0 +1,302 @@
+<!doctype html><html lang="ru"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.2_ballistics_yellow</title>
+<style>body{max-width:1180px;margin:32px auto;padding:0 20px;font:16px/1.55 system-ui;color:#182432}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5f7;padding:16px;font:13px/1.45 monospace}img{max-width:100%;height:auto}table{border-collapse:collapse;font-size:14px}td,th{padding:6px 12px;border:1px solid #ccd4dc}h1,h2{line-height:1.25}.output{margin:16px 0}details{margin:18px 0}summary{cursor:pointer;color:#225e91}iframe{width:100%;height:570px;border:1px solid #ddd}.markdown{font:inherit}</style>
+<p><a href="index.html">← Все задания</a></p>
+<p>Расчёты уже выполнены. Код раскрывается нажатием. Анимации работают без сети. Математические формулы в этой HTML-копии сохранены в записи LaTeX; для их набора откройте исходный notebook в Jupyter.</p>
+<h1>1.2. Баллистика в 2D — 🟢 + 🟡</h1>
+<p>Состояние $y=(x,z,v_x,v_z)$, ось $z$ направлена вверх. Во всех опытах $m=1$ кг, $g=9.81$ м/с², $v_0=20$ м/с, старт и приземление на $z=0$. Сначала проверяем Эйлера и RK4 на линейном сопротивлении, затем исследуем $\dot{\mathbf v}=(0,-g)-k|\mathbf v|\mathbf v$; здесь $k$ имеет размерность м⁻¹. Сила сопротивления равна $-mk|\mathbf v|\mathbf v$.</p>
+<p>Все ячейки самостоятельного ноутбука выполняются последовательно. Анимации встроены в результаты и дополнительно сохраняются в <code>animations/</code>.</p>
+<details><summary>Код Python</summary><pre>import time
+import re
+from pathlib import Path
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from IPython.display import display, HTML, Markdown
+from IPython import get_ipython
+from scipy.optimize import brentq
+
+get_ipython().run_line_magic(&#x27;matplotlib&#x27;, &#x27;inline&#x27;)
+started = time.perf_counter()
+plt.rcParams.update({&#x27;figure.dpi&#x27;: 90, &#x27;font.size&#x27;: 10,
+                     &#x27;axes.grid&#x27;: True, &#x27;animation.embed_limit&#x27;: 50})
+COLORS = plt.cm.viridis(np.linspace(0.08, 0.92, 10))
+
+def step(rhs, state, h, method=&#x27;RK4&#x27;):
+    &quot;&quot;&quot;Явный Эйлер или классический RK4 для автономной системы.&quot;&quot;&quot;
+    k1 = rhs(state)
+    if method == &#x27;Euler&#x27;:
+        return state + h*k1
+    if method != &#x27;RK4&#x27;:
+        raise ValueError(method)
+    k2 = rhs(state + h*k1/2)
+    k3 = rhs(state + h*k2/2)
+    k4 = rhs(state + h*k3)
+    return state + h*(k1 + 2*k2 + 2*k3 + k4)/6
+
+def integrate(rhs, initial, duration, h, method=&#x27;RK4&#x27;):
+    # Последний момент точно равен duration; фактический шаг не больше h.
+    n = int(np.ceil(duration/h))
+    t = np.linspace(0, duration, n+1)
+    y = np.empty((n+1, len(initial)))
+    y[0] = initial
+    for j in range(n):
+        y[j+1] = step(rhs, y[j], t[j+1]-t[j], method)
+    return t, y
+
+def sample(t, y, times):
+    &quot;&quot;&quot;Интерполяция только для кадров; ошибки считаются на расчётной сетке.&quot;&quot;&quot;
+    return np.column_stack([np.interp(times, t, y[:, j]) for j in range(y.shape[1])])
+
+def table(headers, rows):
+    escaped = lambda values: [str(value).replace(&#x27;|&#x27;, &#x27;&amp;#124;&#x27;) for value in values]
+    display(Markdown(&#x27;| &#x27; + &#x27; | &#x27;.join(escaped(headers)) + &#x27; |\n| &#x27; +
+                     &#x27; | &#x27;.join([&#x27;---&#x27;]*len(headers)) + &#x27; |\n&#x27; +
+                     &#x27;\n&#x27;.join(&#x27;| &#x27; + &#x27; | &#x27;.join(escaped(row)) + &#x27; |&#x27; for row in rows)))
+
+def show_animation(fig, update, frames, filename):
+    # Кадры встроены: работают без ffmpeg, сети и дополнительных виджетов.
+    movie = FuncAnimation(fig, update, frames=frames, interval=70, blit=False)
+    html = movie.to_jshtml(default_mode=&#x27;once&#x27;)
+    # Matplotlib использует внешний шрифт для значков; заменяем локальным текстом.
+    html = re.sub(r&#x27;&lt;link\s+rel=&quot;stylesheet&quot;\s+href=&quot;[^&quot;]+&quot;&gt;&#x27;, &#x27;&#x27;, html)
+    icons = {&#x27;fa-minus&#x27;: &#x27;−&#x27;, &#x27;fa-plus&#x27;: &#x27;+&#x27;, &#x27;fa-fast-backward&#x27;: &#x27;⏮&#x27;,
+             &#x27;fa-backward&#x27;: &#x27;◀|&#x27;, &#x27;fa-step-backward&#x27;: &#x27;|◀&#x27;, &#x27;fa-play&#x27;: &#x27;▶&#x27;,
+             &#x27;fa-play fa-flip-horizontal&#x27;: &#x27;◀&#x27;, &#x27;fa-step-forward&#x27;: &#x27;▶|&#x27;, &#x27;fa-pause&#x27;: &#x27;Ⅱ&#x27;,
+             &#x27;fa-stop&#x27;: &#x27;■&#x27;, &#x27;fa-forward&#x27;: &#x27;|▶&#x27;, &#x27;fa-fast-forward&#x27;: &#x27;⏭&#x27;,
+             &#x27;fa-refresh&#x27;: &#x27;↻&#x27;}
+    html = re.sub(r&#x27;&lt;i class=&quot;fa ([^&quot;]+)&quot;[^&gt;]*&gt;&lt;/i&gt;&#x27;,
+                  lambda match: icons.get(match[1], match[1].removeprefix(&#x27;fa-&#x27;)), html)
+    plt.close(fig)
+    out = Path(&#x27;animations&#x27;)
+    out.mkdir(exist_ok=True)
+    (out/filename).write_text(&#x27;&lt;!doctype html&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&#x27; + html, encoding=&#x27;utf-8&#x27;)
+    display(HTML(html))
+</pre></details>
+<details><summary>Код Python</summary><pre>g, mass, v0 = 9.81, 1.0, 20.0
+
+def initial(angle):
+    a = np.deg2rad(angle)
+    return np.array([0., 0., v0*np.cos(a), v0*np.sin(a)])
+
+def linear_rhs(tau):
+    return lambda s: np.array([s[2], s[3], -s[2]/tau, -g-s[3]/tau])
+
+def linear_exact(t, angle, tau):
+    vx, vz = initial(angle)[2:]
+    q = -np.expm1(-np.asarray(t)/tau)
+    return np.column_stack([tau*vx*q, tau*(vz+g*tau)*q-g*tau*t,
+                            vx*(1-q), (vz+g*tau)*(1-q)-g*tau])
+
+def quadratic_rhs(k):
+    def rhs(s):
+        speed = np.hypot(s[2], s[3])
+        return np.array([s[2], s[3], -k*speed*s[2], -g-k*speed*s[3]])
+    return rhs
+
+def flight(angle, k=0., h=.02, method=&#x27;RK4&#x27;, rhs=None):
+    &quot;&quot;&quot;Первое возвращение на землю; последний неполный шаг уточняется по z=0.&quot;&quot;&quot;
+    rhs = quadratic_rhs(k) if rhs is None else rhs
+    ts, ys = [0.], [initial(angle)]
+    for _ in range(int(60/h)+1):
+        candidate = step(rhs, ys[-1], h, method)
+        if candidate[1] &lt; 0:
+            # Для положительного угла пересечение должно быть после подъёма.
+            if ys[-1][1] &lt;= 0:
+                raise ValueError(&#x27;Слишком крупный шаг: подъём не разрешён&#x27;)
+            dt = brentq(lambda dt: step(rhs, ys[-1], dt, method)[1], 0, h, xtol=1e-13)
+            landing = step(rhs, ys[-1], dt, method)
+            assert abs(landing[1]) &lt; 1e-9
+            landing[1] = 0.0
+            ts.append(ts[-1]+dt); ys.append(landing)
+            return np.array(ts), np.array(ys)
+        ts.append(ts[-1]+h); ys.append(candidate)
+    raise RuntimeError(&#x27;Не найден момент падения за 60 с&#x27;)
+</pre></details>
+<h2>1. Проверка на линейном сопротивлении</h2>
+<p>Обозначим $q=1-e^{-t/\tau}$. Тогда $x=\tau v_{x0}q$, $z=\tau(v_{z0}+g\tau)q-g\tau t$, $v_x=v_{x0}e^{-t/\tau}$, $v_z=(v_{z0}+g\tau)e^{-t/\tau}-g\tau$.</p>
+<p>Сравниваем решения до <strong>точного</strong> момента падения при $\tau=2$ с, $\alpha=45°$. Ошибка — максимум евклидовой ошибки положения на сетке. Энергия $E=K+U=m|v|^2/2+mgz$ должна убывать: $dE/dt=-m|v|^2/\tau$.</p>
+<details><summary>Код Python</summary><pre>tau, angle = 2., 45.
+tf = brentq(lambda t: linear_exact(np.array([t]), angle, tau)[0, 1], .01, 10)
+fig, ax = plt.subplots(1, 3, figsize=(13, 3.6))
+rows, errors = [], {}
+for method in [&#x27;Euler&#x27;, &#x27;RK4&#x27;]:
+    errors[method] = []
+    for h in [.16, .08, .04, .02]:
+        t, y = integrate(linear_rhs(tau), initial(angle), tf, h, method)
+        exact = linear_exact(t, angle, tau)
+        err = np.max(np.linalg.norm(y[:, :2]-exact[:, :2], axis=1))
+        errors[method].append(err)
+        rows.append([method, f&#x27;{t[1]:.5f}&#x27;, f&#x27;{err:.3e}&#x27;])
+    t, y = integrate(linear_rhs(tau), initial(angle), tf, .08, method)
+    ax[0].plot(y[:, 0], y[:, 1], label=method)
+    K, U = mass*np.sum(y[:, 2:]**2, axis=1)/2, mass*g*y[:, 1]
+    for vals, label, ls in [(K, &#x27;K&#x27;, &#x27;-&#x27;), (U, &#x27;U&#x27;, &#x27;--&#x27;), (K+U, &#x27;E&#x27;, &#x27;:&#x27;)]:
+        ax[1].plot(t, vals, ls, label=f&#x27;{label} {method}&#x27;)
+exact = linear_exact(np.linspace(0, tf, 400), angle, tau)
+ax[0].plot(exact[:, 0], exact[:, 1], &#x27;k--&#x27;, label=&#x27;Точно&#x27;)
+for drag_tau in [.5, 2., 10.]:
+    ti, yi = flight(angle, h=.02, rhs=linear_rhs(drag_tau))
+    ax[2].plot(yi[:, 0], yi[:, 1], label=f&#x27;τ={drag_tau} с&#x27;)
+ti, yi = flight(angle, k=0)
+ax[2].plot(yi[:, 0], yi[:, 1], &#x27;k--&#x27;, label=&#x27;Без сопротивления&#x27;)
+for a in [ax[0], ax[2]]:
+    a.set(xlabel=&#x27;x, м&#x27;, ylabel=&#x27;z, м&#x27;); a.legend(fontsize=8)
+ax[1].set(xlabel=&#x27;t, с&#x27;, ylabel=&#x27;Энергия, Дж&#x27;); ax[1].legend(fontsize=8, ncol=2)
+fig.tight_layout(); display(fig); plt.close(fig)
+table([&#x27;Метод&#x27;, &#x27;Фактический шаг, с&#x27;, &#x27;max ошибка положения, м&#x27;], rows)
+assert errors[&#x27;RK4&#x27;][-2]/errors[&#x27;RK4&#x27;][-1] &gt; 12
+assert errors[&#x27;Euler&#x27;][-1] &lt; errors[&#x27;Euler&#x27;][0]
+</pre></details>
+<div class="output"><img src="previews/1.2_ballistics_yellow_1.png"></div>
+<table><tr><th>Метод</th><th>Фактический шаг, с</th><th>max ошибка положения, м</th></tr><tr><td>Euler</td><td>0.15065</td><td>1.048e+00</td></tr><tr><td>Euler</td><td>0.07775</td><td>5.321e-01</td></tr><tr><td>Euler</td><td>0.03951</td><td>2.683e-01</td></tr><tr><td>Euler</td><td>0.01992</td><td>1.347e-01</td></tr><tr><td>RK4</td><td>0.15065</td><td>7.692e-06</td></tr><tr><td>RK4</td><td>0.07775</td><td>5.296e-07</td></tr><tr><td>RK4</td><td>0.03951</td><td>3.476e-08</td></tr><tr><td>RK4</td><td>0.01992</td><td>2.227e-09</td></tr></table>
+<h2>2. Квадратичное сопротивление и максимум дальности</h2>
+<p>Перебираем углы от 5° до 85° с шагом 1°. Окрестность лучшего угла уточняем перебором с шагом 0.05°. Это два конечных перебора, не непрерывная оптимизация. При $k=0$ эталон $R=v_0^2\sin(2\alpha)/g$ даёт максимум при 45°.</p>
+<p>Момент приземления ищется внутри последнего шага с помощью повторного шага RK4 длиной $\delta t$ и скалярного поиска корня высоты. Простое сохранение первого подземного узла внесло бы дополнительную ошибку порядка шага.</p>
+<details><summary>Код Python</summary><pre>angles = np.arange(5., 86.)
+ks = [0., .01, .03, .08]
+
+def scan(k, h):
+    ranges = np.array([flight(a, k, h)[1][-1, 0] for a in angles])
+    best = angles[np.argmax(ranges)]
+    fine = np.arange(best-1, best+1.0001, .05)
+    rf = np.array([flight(a, k, h)[1][-1, 0] for a in fine])
+    j = np.argmax(rf)
+    return ranges, float(fine[j]), float(rf[j])
+
+fig, ax = plt.subplots(figsize=(8, 4))
+maxima = {}
+for k in ks:
+    ranges, optimum, distance = scan(k, .02)
+    maxima[k] = (optimum, distance)
+    line, = ax.plot(angles, ranges, label=f&#x27;k={k:g} м⁻¹&#x27;)
+    ax.plot(optimum, distance, &#x27;o&#x27;, color=line.get_color())
+    ax.annotate(f&#x27;{optimum:.2f}°&#x27;, (optimum, distance), xytext=(6, 5), textcoords=&#x27;offset points&#x27;)
+ax.set(xlabel=&#x27;Угол запуска, градусы&#x27;, ylabel=&#x27;Дальность, м&#x27;); ax.legend()
+fig.tight_layout(); display(fig); plt.close(fig)
+table([&#x27;k, м⁻¹&#x27;, &#x27;Лучший угол сетки, °&#x27;, &#x27;Дальность, м&#x27;],
+      [[k, f&#x27;{a:.2f}&#x27;, f&#x27;{r:.5f}&#x27;] for k, (a, r) in maxima.items()])
+assert abs(maxima[0][0]-45) &lt; 1e-8
+for a in [15, 45, 75]:
+    tfree, yfree = flight(a, 0, .07)
+    assert abs(yfree[-1, 0]-v0**2*np.sin(2*np.deg2rad(a))/g) &lt; 1e-9
+    assert abs(tfree[-1]-2*v0*np.sin(np.deg2rad(a))/g) &lt; 1e-10
+</pre></details>
+<div class="output"><img src="previews/1.2_ballistics_yellow_2.png"></div>
+<table><tr><th>k, м⁻¹</th><th>Лучший угол сетки, °</th><th>Дальность, м</th></tr><tr><td>0.0</td><td>45.00</td><td>40.77472</td></tr><tr><td>0.01</td><td>43.00</td><td>31.39146</td></tr><tr><td>0.03</td><td>40.40</td><td>22.39867</td></tr><tr><td>0.08</td><td>37.00</td><td>13.92305</td></tr></table>
+<h2>3. Сходимость: не путать шаг времени с шагом перебора углов</h2>
+<p>Для $k=0.03$ повторим весь поиск при четырёх временных шагах. Дополнительно сравним дальность <strong>при фиксированном</strong> угле 40° с расчётом на шаге 0.00125 с. Это численный эталон, не точное решение. Неизменность лучшего угла сама по себе не доказывает сходимости: угловая сетка различает только 0.05°.</p>
+<details><summary>Код Python</summary><pre>k_selected = .03
+ref_t, ref_y = flight(40, k_selected, .00125)
+rows, range_errors = [], []
+for h in [.08, .04, .02, .01]:
+    _, opt, distance = scan(k_selected, h)
+    ti, yi = flight(40, k_selected, h)
+    err = abs(yi[-1, 0]-ref_y[-1, 0])
+    range_errors.append(err)
+    rows.append([h, f&#x27;{opt:.2f}&#x27;, f&#x27;{distance:.8f}&#x27;, f&#x27;{ti[-1]:.9f}&#x27;, f&#x27;{err:.3e}&#x27;])
+table([&#x27;h, с&#x27;, &#x27;Лучший угол, °&#x27;, &#x27;R_max, м&#x27;, &#x27;t_падения при 40°, с&#x27;, &#x27;|R_h(40°)−R_ref|, м&#x27;], rows)
+assert range_errors[-2]/range_errors[-1] &gt; 10
+
+# Асимметрия: уточняем вершину по v_z=0 тем же приёмом.
+t, y = flight(45, k_selected, .01)
+rhs = quadratic_rhs(k_selected)
+j = np.flatnonzero((y[:-1, 3] &gt; 0) &amp; (y[1:, 3] &lt;= 0))[0]
+dt = brentq(lambda dt: step(rhs, y[j], dt)[3], 0, t[j+1]-t[j])
+apex = step(rhs, y[j], dt)
+t_up, t_down = t[j]+dt, t[-1]-t[j]-dt
+landing_angle = np.rad2deg(np.arctan2(-y[-1, 3], y[-1, 2]))
+K, U = mass*np.sum(y[:, 2:]**2, axis=1)/2, mass*g*y[:, 1]
+fig, ax = plt.subplots(1, 2, figsize=(10, 3.5))
+ax[0].plot(y[:, 0], y[:, 1], label=&#x27;k=0.03, запуск 45°&#x27;)
+ax[0].axvline(apex[0], color=&#x27;k&#x27;, ls=&#x27;:&#x27;, label=&#x27;Вершина&#x27;)
+ax[0].axvline(y[-1, 0]/2, color=&#x27;gray&#x27;, ls=&#x27;--&#x27;, label=&#x27;Половина дальности&#x27;)
+ax[0].set(xlabel=&#x27;x, м&#x27;, ylabel=&#x27;z, м&#x27;); ax[0].legend(fontsize=8)
+for vals, label in [(K, &#x27;K&#x27;), (U, &#x27;U&#x27;), (K+U, &#x27;E&#x27;)]: ax[1].plot(t, vals, label=label)
+ax[1].set(xlabel=&#x27;t, с&#x27;, ylabel=&#x27;Энергия, Дж&#x27;); ax[1].legend()
+fig.tight_layout(); display(fig); plt.close(fig)
+display(Markdown(f&#x27;**Ответ:** для исследованных коэффициентов сопротивления оптимальный угол &#x27;
+                 f&#x27;уменьшается от 45° до {maxima[.08][0]:.2f}°. &#x27;
+                 f&#x27;При k=0.03 и запуске 45° подъём длится {t_up:.3f} с, &#x27;
+                 f&#x27;спуск — {t_down:.3f} с; вершина находится на &#x27;
+                 f&#x27;{100*apex[0]/y[-1, 0]:.1f}% дальности. &#x27;
+                 f&#x27;Угол падения к горизонту {landing_angle:.1f}°, то есть спуск круче подъёма. &#x27;
+                 &#x27;Горизонтальная скорость падает, поэтому траектория теряет зеркальную симметрию.&#x27;))
+assert np.max(np.diff(K+U)) &lt; 1e-7
+</pre></details>
+<table><tr><th>h, с</th><th>Лучший угол, °</th><th>R_max, м</th><th>t_падения при 40°, с</th><th>|R_h(40°)−R_ref|, м</th></tr><tr><td>0.08</td><td>40.40</td><td>22.39866698</td><td>2.194935271</td><td>5.463e-06</td></tr><tr><td>0.04</td><td>40.40</td><td>22.39867208</td><td>2.194935686</td><td>3.257e-07</td></tr><tr><td>0.02</td><td>40.40</td><td>22.39867239</td><td>2.194935711</td><td>1.987e-08</td></tr><tr><td>0.01</td><td>40.40</td><td>22.39867240</td><td>2.194935712</td><td>1.227e-09</td></tr></table>
+<div class="output"><img src="previews/1.2_ballistics_yellow_3.png"></div>
+<p><strong>Ответ:</strong> для исследованных коэффициентов сопротивления оптимальный угол уменьшается от 45° до 37.00°. При k=0.03 и запуске 45° подъём длится 1.115 с, спуск — 1.276 с; вершина находится на 55.9% дальности. Угол падения к горизонту 58.8°, то есть спуск круче подъёма. Горизонтальная скорость падает, поэтому траектория теряет зеркальную симметрию.</p>
+<h2>4. Полёт со скоростью и силами</h2>
+<p>Стрелки имеют разные явно заданные масштабы: 0.12 м рисунка на 1 м/с для скорости, 0.20 м рисунка на 1 Н для сил. Сравнивать длины стрелок скорости и сил физически нельзя. Гравитация постоянна; сопротивление направлено против скорости.</p>
+<details><summary>Код Python</summary><pre>frames = np.linspace(0, t[-1], 91)
+motion = sample(t, y, frames)
+fig, ax = plt.subplots(figsize=(8, 3.8), dpi=75)
+trail, = ax.plot([], [], color=&#x27;tab:blue&#x27;)
+body, = ax.plot([], [], &#x27;o&#x27;, color=&#x27;black&#x27;)
+arrows = [ax.quiver([0], [0], [0], [0], angles=&#x27;xy&#x27;, scale_units=&#x27;xy&#x27;, scale=1,
+                    color=color, label=label) for color, label in
+          [(&#x27;tab:blue&#x27;, &#x27;v: 0.12 м / (м/с)&#x27;), (&#x27;tab:red&#x27;, &#x27;mg: 0.20 м / Н&#x27;), (&#x27;tab:green&#x27;, &#x27;Fсопр: 0.20 м / Н&#x27;)]]
+ax.axhline(0, color=&#x27;k&#x27;); ax.set(xlim=(-4, y[-1, 0]+5), ylim=(-4, y[:, 1].max()+5),
+                               aspect=&#x27;equal&#x27;, xlabel=&#x27;x, м&#x27;, ylabel=&#x27;z, м&#x27;)
+ax.legend(loc=&#x27;upper right&#x27;, fontsize=8); title = ax.set_title(&#x27;&#x27;); fig.tight_layout()
+def update(j):
+    s = motion[j]; v = s[2:]
+    vectors = [.12*v, .20*np.array([0, -mass*g]), -.20*mass*k_selected*np.linalg.norm(v)*v]
+    trail.set_data(motion[:j+1, 0], motion[:j+1, 1]); body.set_data([s[0]], [s[1]])
+    for arrow, vector in zip(arrows, vectors):
+        arrow.set_offsets(s[:2].reshape(1, 2)); arrow.set_UVC([vector[0]], [vector[1]])
+    title.set_text(f&#x27;t = {frames[j]:.2f} с, |v| = {np.linalg.norm(v):.2f} м/с&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.2_vectors.html&#x27;)
+</pre></details>
+<iframe loading="lazy" src="animations/1.2_vectors.html"></iframe>
+<h2>5. Одновременный запуск: без сопротивления и с ним</h2>
+<p>Десять углов от 10° до 80°, одна скорость, единая физическая шкала времени и одинаковые пределы координат на обеих панелях. После падения тело перестаёт двигаться, в точке падения остаётся крестик. Цвет соответствует углу.</p>
+<details><summary>Код Python</summary><pre>launch_angles = np.linspace(10, 80, 10)
+flights = [[flight(a, k, .01) for a in launch_angles] for k in [0, k_selected]]
+frames = np.linspace(0, max(ti[-1] for panel in flights for ti, _ in panel), 111)
+motions = [[sample(ti, yi, frames) for ti, yi in panel] for panel in flights]
+fig, ax = plt.subplots(1, 2, figsize=(10, 4), dpi=75, sharex=True, sharey=True)
+artists = []
+for panel, k in zip(ax, [0, k_selected]):
+    group = []
+    for a, color in zip(launch_angles, COLORS):
+        trail, = panel.plot([], [], color=color, lw=1, label=f&#x27;{a:.0f}°&#x27;)
+        dot, = panel.plot([], [], &#x27;o&#x27;, color=color, ms=4)
+        mark, = panel.plot([], [], &#x27;x&#x27;, color=color, ms=7)
+        group.append((trail, dot, mark))
+    artists.append(group)
+    panel.set(title=f&#x27;k={k:g} м⁻¹&#x27;, xlim=(-1, 44), ylim=(-1, 22), aspect=&#x27;equal&#x27;, xlabel=&#x27;x, м&#x27;)
+    panel.axhline(0, color=&#x27;k&#x27;)
+ax[0].set_ylabel(&#x27;z, м&#x27;); ax[1].legend(ncol=2, fontsize=7, loc=&#x27;upper right&#x27;)
+title = fig.suptitle(&#x27;&#x27;); fig.tight_layout()
+def update(j):
+    for p in range(2):
+        for i, (trail, dot, mark) in enumerate(artists[p]):
+            ti, yi = flights[p][i]; motion = motions[p][i]
+            trail.set_data(motion[:j+1, 0], motion[:j+1, 1])
+            if frames[j] &gt;= ti[-1]:
+                dot.set_data([], []); mark.set_data([yi[-1, 0]], [0])
+            else:
+                dot.set_data([motion[j, 0]], [motion[j, 1]]); mark.set_data([], [])
+    title.set_text(f&#x27;Одновременный запуск, t = {frames[j]:.2f} с&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.2_ensemble.html&#x27;)
+</pre></details>
+<iframe loading="lazy" src="animations/1.2_ensemble.html"></iframe>
+<h2>Выводы и оценка сложности</h2>
+<ul>
+<li>Дальность и оптимальный угол уменьшаются с ростом сопротивления в рассмотренном диапазоне.</li>
+<li>Сопротивление нарушает симметрию: вершина смещается к дальней половине дальности,</li>
+<p>нисходящая ветвь круче, скорость при падении меньше начальной.</p>
+<li>Уточнение момента падения необходимо для осмысленного сравнения временных шагов.</li>
+<p>Точность угла дополнительно ограничивает дискретный перебор.</p>
+<li>Наиболее сложные места: обработка события приземления и остановка отдельных тел</li>
+<p>в общей анимации. Поиск корня здесь нужен лишь внутри уже найденного шага.</p>
+</ul>
+<p><strong>Оценка для студента:</strong> 7–12 часов со знанием Python; 12–18 часов при первом опыте численного моделирования и анимаций. Это ориентир преподавателю, не результат хронометража.</p>
+<details><summary>Код Python</summary><pre>print(f&#x27;Все численные проверки пройдены. Полное выполнение: {time.perf_counter()-started:.1f} с.&#x27;)
+</pre></details>
+<pre>Все численные проверки пройдены. Полное выполнение: 15.5 с.
+</pre>
+</html>

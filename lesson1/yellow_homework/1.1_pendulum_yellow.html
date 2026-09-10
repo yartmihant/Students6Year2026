@@ -1,0 +1,275 @@
+<!doctype html><html lang="ru"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.1_pendulum_yellow</title>
+<style>body{max-width:1180px;margin:32px auto;padding:0 20px;font:16px/1.55 system-ui;color:#182432}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5f7;padding:16px;font:13px/1.45 monospace}img{max-width:100%;height:auto}table{border-collapse:collapse;font-size:14px}td,th{padding:6px 12px;border:1px solid #ccd4dc}h1,h2{line-height:1.25}.output{margin:16px 0}details{margin:18px 0}summary{cursor:pointer;color:#225e91}iframe{width:100%;height:570px;border:1px solid #ddd}.markdown{font:inherit}</style>
+<p><a href="index.html">← Все задания</a></p>
+<p>Расчёты уже выполнены. Код раскрывается нажатием. Анимации работают без сети. Математические формулы в этой HTML-копии сохранены в записи LaTeX; для их набора откройте исходный notebook в Jupyter.</p>
+<h1>1.1. Математический маятник — 🟢 + 🟡</h1>
+<p><strong>Цель:</strong> отделить ошибку линейной модели от ошибки интегрирования и увидеть зависимость периода от амплитуды. Все ячейки выполняются сверху вниз; анимации имеют кнопки воспроизведения и ползунок. Параметры можно менять в ячейках ниже.</p>
+<p>Состояние $y=(\theta,\dot\theta)$, углы в радианах. Берём $m=L=1$, $g=9.81$; $\omega_0=\sqrt{g/L}$ и $T_0=2\pi/\omega_0$. Начальная угловая скорость нулевая. Линейная модель: $\ddot\theta=-\omega_0^2\theta$; нелинейная: $\ddot\theta=-\omega_0^2\sin\theta$.</p>
+<p>Для линейной модели $U=mgL\theta^2/2$, для нелинейной $U=mgL(1-\cos\theta)$; в обоих случаях $K=mL^2\dot\theta^2/2$. Смешивать эти определения при проверке сохранения энергии нельзя. Разделы 1–2 закрывают базовый уровень, остальные — жёлтый.</p>
+<details><summary>Код Python</summary><pre>import time
+import re
+from pathlib import Path
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from IPython.display import display, HTML, Markdown
+from IPython import get_ipython
+from scipy.optimize import brentq
+
+get_ipython().run_line_magic(&#x27;matplotlib&#x27;, &#x27;inline&#x27;)
+started = time.perf_counter()
+plt.rcParams.update({&#x27;figure.dpi&#x27;: 90, &#x27;font.size&#x27;: 10,
+                     &#x27;axes.grid&#x27;: True, &#x27;animation.embed_limit&#x27;: 50})
+COLORS = plt.cm.viridis(np.linspace(0.08, 0.92, 10))
+
+def step(rhs, state, h, method=&#x27;RK4&#x27;):
+    &quot;&quot;&quot;Явный Эйлер или классический RK4 для автономной системы.&quot;&quot;&quot;
+    k1 = rhs(state)
+    if method == &#x27;Euler&#x27;:
+        return state + h*k1
+    if method != &#x27;RK4&#x27;:
+        raise ValueError(method)
+    k2 = rhs(state + h*k1/2)
+    k3 = rhs(state + h*k2/2)
+    k4 = rhs(state + h*k3)
+    return state + h*(k1 + 2*k2 + 2*k3 + k4)/6
+
+def integrate(rhs, initial, duration, h, method=&#x27;RK4&#x27;):
+    # Последний момент точно равен duration; фактический шаг не больше h.
+    n = int(np.ceil(duration/h))
+    t = np.linspace(0, duration, n+1)
+    y = np.empty((n+1, len(initial)))
+    y[0] = initial
+    for j in range(n):
+        y[j+1] = step(rhs, y[j], t[j+1]-t[j], method)
+    return t, y
+
+def sample(t, y, times):
+    &quot;&quot;&quot;Интерполяция только для кадров; ошибки считаются на расчётной сетке.&quot;&quot;&quot;
+    return np.column_stack([np.interp(times, t, y[:, j]) for j in range(y.shape[1])])
+
+def table(headers, rows):
+    escaped = lambda values: [str(value).replace(&#x27;|&#x27;, &#x27;&amp;#124;&#x27;) for value in values]
+    display(Markdown(&#x27;| &#x27; + &#x27; | &#x27;.join(escaped(headers)) + &#x27; |\n| &#x27; +
+                     &#x27; | &#x27;.join([&#x27;---&#x27;]*len(headers)) + &#x27; |\n&#x27; +
+                     &#x27;\n&#x27;.join(&#x27;| &#x27; + &#x27; | &#x27;.join(escaped(row)) + &#x27; |&#x27; for row in rows)))
+
+def show_animation(fig, update, frames, filename):
+    # Кадры встроены: работают без ffmpeg, сети и дополнительных виджетов.
+    movie = FuncAnimation(fig, update, frames=frames, interval=70, blit=False)
+    html = movie.to_jshtml(default_mode=&#x27;once&#x27;)
+    # Matplotlib использует внешний шрифт для значков; заменяем локальным текстом.
+    html = re.sub(r&#x27;&lt;link\s+rel=&quot;stylesheet&quot;\s+href=&quot;[^&quot;]+&quot;&gt;&#x27;, &#x27;&#x27;, html)
+    icons = {&#x27;fa-minus&#x27;: &#x27;−&#x27;, &#x27;fa-plus&#x27;: &#x27;+&#x27;, &#x27;fa-fast-backward&#x27;: &#x27;⏮&#x27;,
+             &#x27;fa-backward&#x27;: &#x27;◀|&#x27;, &#x27;fa-step-backward&#x27;: &#x27;|◀&#x27;, &#x27;fa-play&#x27;: &#x27;▶&#x27;,
+             &#x27;fa-play fa-flip-horizontal&#x27;: &#x27;◀&#x27;, &#x27;fa-step-forward&#x27;: &#x27;▶|&#x27;, &#x27;fa-pause&#x27;: &#x27;Ⅱ&#x27;,
+             &#x27;fa-stop&#x27;: &#x27;■&#x27;, &#x27;fa-forward&#x27;: &#x27;|▶&#x27;, &#x27;fa-fast-forward&#x27;: &#x27;⏭&#x27;,
+             &#x27;fa-refresh&#x27;: &#x27;↻&#x27;}
+    html = re.sub(r&#x27;&lt;i class=&quot;fa ([^&quot;]+)&quot;[^&gt;]*&gt;&lt;/i&gt;&#x27;,
+                  lambda match: icons.get(match[1], match[1].removeprefix(&#x27;fa-&#x27;)), html)
+    plt.close(fig)
+    out = Path(&#x27;animations&#x27;)
+    out.mkdir(exist_ok=True)
+    (out/filename).write_text(&#x27;&lt;!doctype html&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&#x27; + html, encoding=&#x27;utf-8&#x27;)
+    display(HTML(html))
+</pre></details>
+<details><summary>Код Python</summary><pre>g, L, m = 9.81, 1.0, 1.0
+w0 = np.sqrt(g/L)
+T0 = 2*np.pi/w0
+
+def pendulum(length=L, nonlinear=True):
+    return lambda y: np.array([y[1], -g/length*(np.sin(y[0]) if nonlinear else y[0])])
+
+def energy(y, nonlinear=True, length=L):
+    kinetic = m*length**2*y[:, 1]**2/2
+    potential = m*g*length*(1-np.cos(y[:, 0]) if nonlinear else y[:, 0]**2/2)
+    return kinetic, potential
+</pre></details>
+<h2>1. Линейная модель: точное решение и сходимость</h2>
+<p>При $\theta(0)=A$, $\dot\theta(0)=0$ точное решение равно $\theta=A\cos\omega_0t$, $\dot\theta=-A\omega_0\sin\omega_0t$. Считаем до $5T_0$. Ошибка — максимум $|\theta_h-\theta_{exact}|$ по всей сетке. При делении шага пополам ожидается примерно двукратное уменьшение ошибки Эйлера и шестнадцатикратное для RK4 в асимптотическом режиме.</p>
+<details><summary>Код Python</summary><pre>A = np.deg2rad(10)
+fig, ax = plt.subplots(1, 3, figsize=(13, 3.4))
+rows, errors = [], {}
+for method in [&#x27;Euler&#x27;, &#x27;RK4&#x27;]:
+    errors[method] = []
+    for n in [100, 200, 400, 800]:
+        t, y = integrate(pendulum(nonlinear=False), [A, 0], 5*T0, T0/n, method)
+        err = np.max(np.abs(y[:, 0]-A*np.cos(w0*t)))
+        errors[method].append(err)
+        rows.append([method, f&#x27;T₀/{n}&#x27;, f&#x27;{err:.3e}&#x27;])
+    t, y = integrate(pendulum(nonlinear=False), [A, 0], 5*T0, T0/200, method)
+    K, U = energy(y, nonlinear=False)
+    ax[0].plot(t/T0, y[:, 0], label=method)
+    ax[1].plot(y[:, 0], y[:, 1], label=method)
+    ax[2].plot(t/T0, K, label=f&#x27;K {method}&#x27;)
+    ax[2].plot(t/T0, U, &#x27;--&#x27;, label=f&#x27;U {method}&#x27;)
+tt = np.linspace(0, 5*T0, 2000)
+ax[0].plot(tt/T0, A*np.cos(w0*tt), &#x27;k:&#x27;, label=&#x27;Точно&#x27;)
+ax[1].plot(A*np.cos(w0*tt), -A*w0*np.sin(w0*tt), &#x27;k:&#x27;, label=&#x27;Точно&#x27;)
+for a, xlabel, ylabel in zip(ax, [&#x27;t / T₀&#x27;, &#x27;θ, рад&#x27;, &#x27;t / T₀&#x27;], [&#x27;θ, рад&#x27;, &#x27;dθ/dt, рад/с&#x27;, &#x27;Энергия, Дж&#x27;]):
+    a.set(xlabel=xlabel, ylabel=ylabel); a.legend(fontsize=8)
+fig.tight_layout(); display(fig); plt.close(fig)
+table([&#x27;Метод&#x27;, &#x27;Шаг&#x27;, &#x27;max |Δθ|, рад&#x27;], rows)
+assert errors[&#x27;RK4&#x27;][-2]/errors[&#x27;RK4&#x27;][-1] &gt; 12
+assert errors[&#x27;Euler&#x27;][-1] &lt; errors[&#x27;Euler&#x27;][0]
+</pre></details>
+<div class="output"><img src="previews/1.1_pendulum_yellow_1.png"></div>
+<table><tr><th>Метод</th><th>Шаг</th><th>max |Δθ|, рад</th></tr><tr><td>Euler</td><td>T₀/100</td><td>2.915e-01</td></tr><tr><td>Euler</td><td>T₀/200</td><td>1.111e-01</td></tr><tr><td>Euler</td><td>T₀/400</td><td>4.881e-02</td></tr><tr><td>Euler</td><td>T₀/800</td><td>2.291e-02</td></tr><tr><td>RK4</td><td>T₀/100</td><td>6.725e-07</td></tr><tr><td>RK4</td><td>T₀/200</td><td>4.217e-08</td></tr><tr><td>RK4</td><td>T₀/400</td><td>2.640e-09</td></tr><tr><td>RK4</td><td>T₀/800</td><td>1.651e-10</td></tr></table>
+<h2>2. Нелинейная модель: период и критерий точности линейного приближения</h2>
+<p>Независимый эталон для $0&lt;A&lt;\pi$: $T(A)=4\sqrt{L/g}\,K(\sin^2(A/2))$. Здесь <code>scipy.special.ellipk</code> принимает <strong>параметр</strong> $m=\sin^2(A/2)$, а не модуль $\sin(A/2)$.</p>
+<p>Численный период равен четырём временам первого пересечения $\theta=0$ сверху при старте из покоя. После обнаружения смены знака уточняем событие внутри шага: ищем корень $\theta(\mathrm{RK4}(y_j,\delta t))=0$. Это устраняет ошибку простого округления к узлу сетки; интегрирование до события всё ещё имеет свою ошибку.</p>
+<p>Слово «достаточно» определим явно: относительная ошибка периода $(T(A)-T_0)/T(A)\leq1\%$. Также посчитаем порог для 5%.</p>
+<details><summary>Код Python</summary><pre>from scipy.special import ellipk
+
+def exact_period(amplitude, length=L):
+    return 4*np.sqrt(length/g)*ellipk(np.sin(amplitude/2)**2)
+
+def measured_period(amplitude, h):
+    rhs = pendulum()
+    t, y = integrate(rhs, [amplitude, 0], exact_period(amplitude)/2, h)
+    j = np.flatnonzero((y[:-1, 0] &gt; 0) &amp; (y[1:, 0] &lt;= 0))[0]
+    dt = brentq(lambda dt: step(rhs, y[j], dt)[0], 0, t[j+1]-t[j], xtol=1e-14)
+    return 4*(t[j]+dt)
+
+degrees = np.linspace(2, 160, 45)
+amplitudes = np.deg2rad(degrees)
+periods = np.array([measured_period(a, T0/250) for a in amplitudes])
+fig, ax = plt.subplots(figsize=(7.5, 3.5))
+ax.plot(degrees, exact_period(amplitudes)/T0, label=&#x27;Эллиптический интеграл&#x27;)
+ax.plot(degrees, periods/T0, &#x27;.&#x27;, label=&#x27;RK4, событие θ=0&#x27;)
+ax.axhline(1, color=&#x27;k&#x27;, ls=&#x27;--&#x27;, label=&#x27;Линейная модель&#x27;)
+ax.set(xlabel=&#x27;Начальная амплитуда, градусы&#x27;, ylabel=&#x27;T(A) / T₀&#x27;); ax.legend()
+display(fig); plt.close(fig)
+thresholds = [np.rad2deg(brentq(lambda a: 1-T0/exact_period(a)-eps, 1e-6, 3.0)) for eps in [.01, .05]]
+display(Markdown(f&#x27;**Ответ:** при выбранном критерии линейная модель предсказывает период &#x27;
+                 f&#x27;с ошибкой до 1% примерно при **A ≤ {thresholds[0]:.2f}°**, &#x27;
+                 f&#x27;до 5% — при **A ≤ {thresholds[1]:.2f}°**. &#x27;
+                 &#x27;При росте амплитуды нелинейный период растёт.&#x27;))
+assert np.max(np.abs(periods/exact_period(amplitudes)-1)) &lt; 2e-6
+</pre></details>
+<div class="output"><img src="previews/1.1_pendulum_yellow_2.png"></div>
+<p><strong>Ответ:</strong> при выбранном критерии линейная модель предсказывает период с ошибкой до 1% примерно при <strong>A ≤ 22.93°</strong>, до 5% — при <strong>A ≤ 51.35°</strong>. При росте амплитуды нелинейный период растёт.</p>
+<h2>3. Раздельно: ошибка модели и ошибка шага при A = 90°</h2>
+<p>Первый график сравнивает линейную модель с нелинейным расчётом на мелкой сетке. Второй показывает только ошибку нелинейного периода относительно точной формулы. Уменьшение шага не исправляет ошибку линеаризации. Дополнительно проверяем обмен кинетической и потенциальной энергией в нелинейной системе.</p>
+<details><summary>Код Python</summary><pre>A = np.pi/2
+TA = exact_period(A)
+rows, period_errors = [], []
+ns = np.array([25, 50, 100, 200])
+for n in ns:
+    numerical = measured_period(A, T0/n)
+    error = abs(numerical-TA)
+    period_errors.append(error)
+    rows.append([f&#x27;T₀/{n}&#x27;, f&#x27;{numerical:.10f}&#x27;, f&#x27;{error:.3e}&#x27;])
+table([&#x27;Шаг&#x27;, &#x27;Численный период, с&#x27;, &#x27;|T_h − T(A)|, с&#x27;], rows)
+t, yn = integrate(pendulum(), [A, 0], 4*TA, T0/500)
+yl = np.column_stack([A*np.cos(w0*t), -A*w0*np.sin(w0*t)])
+K, U = energy(yn)
+fig, ax = plt.subplots(1, 3, figsize=(13, 3.5))
+ax[0].plot(t/T0, yl[:, 0], label=&#x27;Линейная&#x27;); ax[0].plot(t/T0, yn[:, 0], label=&#x27;Нелинейная&#x27;)
+ax[0].set(xlabel=&#x27;t / T₀&#x27;, ylabel=&#x27;θ, рад&#x27;); ax[0].legend()
+ax[1].loglog(T0/ns, period_errors, &#x27;o-&#x27;); ax[1].set(xlabel=&#x27;Шаг, с&#x27;, ylabel=&#x27;Ошибка периода, с&#x27;)
+ax[1].set_xticks(T0/ns, [f&#x27;{h:.3f}&#x27; for h in T0/ns]); ax[1].xaxis.set_minor_formatter(plt.NullFormatter())
+for vals, label in [(K, &#x27;K&#x27;), (U, &#x27;U&#x27;), (K+U, &#x27;K+U&#x27;)]:
+    ax[2].plot(t/T0, vals, label=label)
+ax[2].set(xlabel=&#x27;t / T₀&#x27;, ylabel=&#x27;Энергия, Дж&#x27;); ax[2].legend()
+fig.tight_layout(); display(fig); plt.close(fig)
+display(Markdown(f&#x27;При A=90° ошибка линейного периода составляет **{100*(1-T0/TA):.2f}%**. &#x27;
+                 f&#x27;Ошибка RK4 при самом мелком проверенном шаге — **{period_errors[-1]:.2e} с**.&#x27;))
+assert period_errors[-2]/period_errors[-1] &gt; 12
+assert np.max(np.abs((K+U)/(K[0]+U[0])-1)) &lt; 1e-7
+</pre></details>
+<table><tr><th>Шаг</th><th>Численный период, с</th><th>|T_h − T(A)|, с</th></tr><tr><td>T₀/25</td><td>2.3678732220</td><td>3.127e-05</td></tr><tr><td>T₀/50</td><td>2.3678442157</td><td>2.268e-06</td></tr><tr><td>T₀/100</td><td>2.3678420867</td><td>1.391e-07</td></tr><tr><td>T₀/200</td><td>2.3678419563</td><td>8.697e-09</td></tr></table>
+<div class="output"><img src="previews/1.1_pendulum_yellow_3.png"></div>
+<p>При A=90° ошибка линейного периода составляет <strong>15.28%</strong>. Ошибка RK4 при самом мелком проверенном шаге — <strong>8.70e-09 с</strong>.</p>
+<h2>4. Анимация: линейный и нелинейный маятники с фазовыми следами</h2>
+<p>Слева геометрическое положение груза; справа $(\theta,\dot\theta)$. Оба движения показаны в один физический момент времени. Для линейного маятника используется точное решение, для нелинейного — RK4 из предыдущей ячейки.</p>
+<details><summary>Код Python</summary><pre>frames = np.linspace(0, 3*TA, 101)
+nonlinear = sample(t, yn, frames)
+linear = np.column_stack([A*np.cos(w0*frames), -A*w0*np.sin(w0*frames)])
+fig, ax = plt.subplots(1, 2, figsize=(8, 3.4), dpi=75)
+rods, trails, dots = [], [], []
+for color, label in [(&#x27;tab:blue&#x27;, &#x27;Линейный&#x27;), (&#x27;tab:orange&#x27;, &#x27;Нелинейный&#x27;)]:
+    rods.append(ax[0].plot([], [], &#x27;o-&#x27;, color=color, label=label)[0])
+    trails.append(ax[1].plot([], [], color=color, alpha=.7)[0])
+    dots.append(ax[1].plot([], [], &#x27;o&#x27;, color=color, label=label)[0])
+ax[0].set(xlim=(-1.2, 1.2), ylim=(-1.2, .3), aspect=&#x27;equal&#x27;, xlabel=&#x27;x, м&#x27;, ylabel=&#x27;y, м&#x27;)
+ax[1].set(xlim=(-1.8, 1.8), ylim=(-5.3, 5.3), xlabel=&#x27;θ, рад&#x27;, ylabel=&#x27;dθ/dt, рад/с&#x27;)
+ax[0].legend(); title = fig.suptitle(&#x27;&#x27;); fig.tight_layout()
+def update(j):
+    for state, rod, trail, dot in zip([linear, nonlinear], rods, trails, dots):
+        angle = state[j, 0]
+        rod.set_data([0, L*np.sin(angle)], [0, -L*np.cos(angle)])
+        trail.set_data(state[:j+1, 0], state[:j+1, 1])
+        dot.set_data([state[j, 0]], [state[j, 1]])
+    title.set_text(f&#x27;A = 90°, t = {frames[j]:.2f} с&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.1_comparison.html&#x27;)
+</pre></details>
+<iframe loading="lazy" src="animations/1.1_comparison.html"></iframe>
+<h2>5. Десять длин и соизмеримые частоты</h2>
+<p>Для всех маятников $A=20°$, но $\omega_{0,i}=n_i\omega_b$, $n_i=10,\ldots,19$, $\omega_b=0.4$ с⁻¹ и $L_i=g/\omega_{0,i}^2$. Используем <strong>нелинейную</strong> модель: при одинаковой амплитуде множитель поправки к периоду одинаков, поэтому соизмеримость сохраняется. Общее время повторения $T_{sync}=4K(\sin^2(A/2))/\omega_b$. Чтобы не пропускать быстрые колебания, здесь 241 кадр.</p>
+<details><summary>Код Python</summary><pre>ensemble_A = np.deg2rad(20)
+harmonics = np.arange(10, 20)
+wb = .4
+lengths = g/(harmonics*wb)**2
+sync = 4*ellipk(np.sin(ensemble_A/2)**2)/wb
+frames = np.linspace(0, sync, 241)
+states = []
+for length in lengths:
+    ti, yi = integrate(pendulum(length), [ensemble_A, 0], sync, .002)
+    states.append(sample(ti, yi, frames))
+fig, ax = plt.subplots(figsize=(9, 3.4), dpi=75)
+pivots = np.arange(10)*.6
+rods = [ax.plot([], [], &#x27;o-&#x27;, color=c)[0] for c in COLORS]
+for x, n in zip(pivots, harmonics):
+    ax.text(x, .06, f&#x27;n={n}&#x27;, ha=&#x27;center&#x27;, fontsize=8)
+ax.set(xlim=(-.5, pivots[-1]+.5), ylim=(-.72, .17), xlabel=&#x27;x, м&#x27;, ylabel=&#x27;y, м&#x27;, aspect=&#x27;equal&#x27;)
+title = ax.set_title(&#x27;&#x27;); fig.tight_layout()
+def update(j):
+    for i, rod in enumerate(rods):
+        theta = states[i][j, 0]
+        rod.set_data([pivots[i], pivots[i]+lengths[i]*np.sin(theta)], [0, -lengths[i]*np.cos(theta)])
+    title.set_text(f&#x27;Соизмеримые частоты, t / T_sync = {frames[j]/sync:.3f}&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.1_lengths.html&#x27;)
+assert max(abs(s[-1, 0]-ensemble_A) for s in states) &lt; 1e-6
+</pre></details>
+<iframe loading="lazy" src="animations/1.1_lengths.html"></iframe>
+<h2>6. Одинаковые длины, разные амплитуды</h2>
+<p>Все длины равны 1 м, начальные углы от 10° до 150°, старт из покоя. Точки подвеса разнесены только для читаемости. Даже без взаимодействия и диссипации фазы расходятся: большие амплитуды имеют большие периоды.</p>
+<details><summary>Код Python</summary><pre>angles = np.deg2rad(np.linspace(10, 150, 10))
+frames = np.linspace(0, 4*T0, 121)
+states = []
+for angle in angles:
+    ti, yi = integrate(pendulum(), [angle, 0], frames[-1], T0/400)
+    states.append(sample(ti, yi, frames))
+fig, axes = plt.subplots(2, 5, figsize=(9, 4.5), dpi=75, sharex=True, sharey=True)
+rods = []
+for panel, angle, color in zip(axes.flat, angles, COLORS):
+    rods.append(panel.plot([], [], &#x27;o-&#x27;, color=color)[0])
+    panel.set(xlim=(-1.2, 1.2), ylim=(-1.2, 1.05), aspect=&#x27;equal&#x27;, title=f&#x27;A={np.rad2deg(angle):.0f}°&#x27;)
+    panel.set_xticks([-1, 0, 1]); panel.set_yticks([-1, 0, 1])
+title = fig.suptitle(&#x27;&#x27;); fig.tight_layout(rect=(0, 0, 1, .92))
+def update(j):
+    for i, rod in enumerate(rods):
+        theta = states[i][j, 0]
+        rod.set_data([0, L*np.sin(theta)], [0, -L*np.cos(theta)])
+    title.set_text(f&#x27;Одинаковая длина, разные амплитуды; t = {frames[j]:.2f} с&#x27;)
+show_animation(fig, update, len(frames), &#x27;1.1_amplitudes.html&#x27;)
+</pre></details>
+<iframe loading="lazy" src="animations/1.1_amplitudes.html"></iframe>
+<h2>Выводы и оценка сложности</h2>
+<ul>
+<li>RK4 сходится к нелинейной модели; переход к малому шагу не делает её линейной.</li>
+<li>При критерии ошибки периода 1% допустимая амплитуда около 23°; ответ зависит от допуска.</li>
+<li>Соизмеримые частоты можно получить подбором длин, если начальные амплитуды одинаковы.</li>
+<p>При разных амплитудах поправки к периодам различаются.</p>
+<li>Самые содержательные этапы: определение периода по событию и разделение двух ошибок.</li>
+<p>Самая трудоёмкая техническая часть: три анимации и синхронизация панелей.</p>
+</ul>
+<p><strong>Оценка для студента после первого семинара:</strong> 6–10 часов при знакомстве с Python, 10–16 часов при первом опыте NumPy/Matplotlib/Jupyter. Это экспертная оценка, а не измеренное время работы студента. Расчёт периода через эллиптический интеграл — дополнительный эталон для проверки; для выполнения задания достаточно сходимости численного периода.</p>
+<details><summary>Код Python</summary><pre>print(f&#x27;Все численные проверки пройдены. Полное выполнение: {time.perf_counter()-started:.1f} с.&#x27;)
+</pre></details>
+<pre>Все численные проверки пройдены. Полное выполнение: 30.1 с.
+</pre>
+</html>

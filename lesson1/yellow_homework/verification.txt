@@ -1,0 +1,11 @@
+1.1_pendulum_yellow.ipynb: 9 executed cells, 3 figures, 3 animations
+1.2_ballistics_yellow.ipynb: 8 executed cells, 3 figures, 2 animations
+1.3_orbits_yellow.ipynb: 9 executed cells, 3 figures, 3 animations
+1.1_amplitudes.html: 121 decodable embedded frames, no external dependencies
+1.1_comparison.html: 101 decodable embedded frames, no external dependencies
+1.1_lengths.html: 241 decodable embedded frames, no external dependencies
+1.2_ensemble.html: 111 decodable embedded frames, no external dependencies
+1.2_vectors.html: 91 decodable embedded frames, no external dependencies
+1.3_ensemble.html: 121 decodable embedded frames, no external dependencies
+1.3_methods.html: 111 decodable embedded frames, no external dependencies
+1.3_sectors.html: 121 decodable embedded frames, no external dependencies

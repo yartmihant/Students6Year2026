@@ -12,11 +12,14 @@ omega = 1
 def d(s):
     u = s[0]
     v = s[1]
-    return np.array((v, -2*gamma*v-omega**2*np.sin(u)))
+    return np.array((
+        v, 
+        - 2*gamma*v - omega**2*np.sin(u)
+    ))
 
 
-u_0 = 0
-v_0 = 2
+u_0 = 1
+v_0 = 0
 
 s_0 = np.array((u_0, v_0), dtype=np.float32)
 
@@ -71,7 +74,7 @@ def rk4_step(s):
 
 # SIMULATION
 integration_method = rk4_step
-method_name = "RK4"
+method_name = "rk4_step"
 
 for i in range(1, steps_number + 1):
     s_trajectory[i] = integration_method(s_trajectory[i - 1])
@@ -138,7 +141,6 @@ def show_pendulum_move(u_trajectory):
 
         return (line_string, line_trajectory)
 
-    ax.legend(['Нить', 'Грузик маятника'])
 
     ani = animation.FuncAnimation(
         fig=fig,
