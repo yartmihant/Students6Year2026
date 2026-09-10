@@ -14,9 +14,8 @@ def d(s):
     v = s[1]
     return np.array((
         v, 
-        - 2*gamma*v - omega**2*np.sin(u)
+        - omega**2*u # - 2*gamma*v - omega**2*np.sin(u)
     ))
-
 
 u_0 = 1
 v_0 = 0
@@ -41,28 +40,28 @@ time_axes = np.linspace(t_min, t_max, steps_number + 1)
 
 # INTEGRATION_METHODS
 
-def explicit_euler_step(s):
+def explicit_euler_step(s, delta_t):
     d1 = delta_t * d(s)
     return s + d1
 
-def implicit_euler_step(s):
+def implicit_euler_step(s, delta_t):
     d1 = delta_t * d(s)
     d2 = delta_t * d(s + d1)
     return s + d2
 
-def average_exp_imp_step(s):
+def average_exp_imp_step(s, delta_t):
     # RK2
     d1 = delta_t * d(s)
     d2 = delta_t * d(s + d1)
     return s + (d1 + d2) / 2
 
-def half_point_step(s):
+def half_point_step(s, delta_t):
     # RK2
     d1 = delta_t * d(s)
     d2 = delta_t * d(s + d1 / 2)
     return s + d2
 
-def rk4_step(s):
+def rk4_step(s, delta_t):
     # RK4
     d1 = delta_t * d(s)
     d2 = delta_t * d(s + d1 / 2)
@@ -74,11 +73,9 @@ def rk4_step(s):
 
 # SIMULATION
 integration_method = rk4_step
-method_name = "rk4_step"
 
 for i in range(1, steps_number + 1):
-    s_trajectory[i] = integration_method(s_trajectory[i - 1])
-
+    s_trajectory[i] = integration_method(s_trajectory[i - 1], delta_t)
 
 u_trajectory = s_trajectory[:, 0]
 v_trajectory = s_trajectory[:, 1]
@@ -87,6 +84,8 @@ energy = v_trajectory**2 + omega**2 * 2 * (1 - np.cos(u_trajectory))
 
 
 # VISUALIZATION
+
+method_name = integration_method.__name__
 
 fig, axs = plt.subplots(3, layout='constrained')
 
