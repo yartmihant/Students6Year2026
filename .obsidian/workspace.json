@@ -83,7 +83,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "0ffe49e4fc6ba472",
@@ -190,6 +191,11 @@
   },
   "active": "81b3aef259cc80be",
   "lastOpenFiles": [
+    "homework/masalkin/1.2/critique.md",
+    "README.md",
+    "homework/uhanov/1.1/critique.md",
+    "homework.md",
+    "attendance.md",
     "lesson1/yellow_homework/tools/__pycache__/execute_notebooks.cpython-313.pyc",
     "lesson1/yellow_homework/tools/__pycache__",
     "lesson1/yellow_homework/tools/execute_notebooks.py",
@@ -210,7 +216,6 @@
     "lesson1/yellow_homework/animations/1.3_ensemble.html",
     "lesson1/yellow_homework/animations/1.2_vectors.html",
     "lesson1/yellow_homework/animations/1.2_ensemble.html",
-    "lesson1/yellow_homework/animations/1.1_lengths.html",
     "lesson1/yellow_homework/README.md",
     "yellow_homework/README.md"
   ]
