@@ -8,7 +8,8 @@ from matplotlib.cm import get_cmap
 
 
 def plot_trajectories(theta_list, integrate_func, x_target, y_target, x_start, y_start,
-                     title="Траектории для разных углов стрельбы", custom_labels=None):
+                     title="Траектории для разных углов стрельбы", custom_labels=None,
+                     coordinate_indices=(0, 1)):
     """
     Визуализация траекторий для списка углов
 
@@ -19,6 +20,8 @@ def plot_trajectories(theta_list, integrate_func, x_target, y_target, x_start, y
         x_start, y_start: координаты старта
         title: заголовок графика
         custom_labels: пользовательские метки для легенд (если None, используются углы)
+        coordinate_indices: индексы x и y в состоянии: (0, 1) для [x, y, vx, vy],
+                            (1, 2) для [t, x, y, vx, vy]
     """
     plt.figure(figsize=(12, 8))
 
@@ -27,8 +30,8 @@ def plot_trajectories(theta_list, integrate_func, x_target, y_target, x_start, y
     for i, theta in enumerate(theta_list):
         final_state, trajectory = integrate_func(theta, return_full_trajectory=True)
 
-        x_coords = trajectory[:, 0]
-        y_coords = trajectory[:, 1]
+        x_coords = trajectory[:, coordinate_indices[0]]
+        y_coords = trajectory[:, coordinate_indices[1]]
 
         # Определяем метку для легенды
         if custom_labels is not None and i < len(custom_labels):
@@ -158,9 +161,9 @@ def plot_convergence(theta_history, residual_history, method_name):
     ax1.grid(True, alpha=0.3)
 
     # График изменения невязки
-    ax2.plot(iterations, residual_history, 'ro-', linewidth=2, markersize=6)
+    ax2.plot(iterations, np.abs(residual_history), 'ro-', linewidth=2, markersize=6)
     ax2.set_xlabel('Итерация')
-    ax2.set_ylabel('Невязка, м')
+    ax2.set_ylabel('|Невязка|, м')
     ax2.set_title(f'Сходимость невязки ({method_name})')
     ax2.set_yscale('log')
     ax2.grid(True, alpha=0.3)
