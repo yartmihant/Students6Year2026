@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "lesson5/TO_AGENTS.md",
+                "file": "lesson5/AGENT_DEVELOPMENT_METHODOLOGY.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "TO_AGENTS"
+              "title": "AGENT_DEVELOPMENT_METHODOLOGY"
             }
           }
         ]
@@ -190,8 +190,9 @@
   },
   "active": "9eeba055e83f10d3",
   "lastOpenFiles": [
-    "lesson5/AGENT_DEVELOPMENT_METHODOLOGY.md",
     "lesson5/TO_AGENTS.md",
+    "lesson5/TRANSITION_TO_AGENTS.md",
+    "lesson5/AGENT_DEVELOPMENT_METHODOLOGY.md",
     "README.md",
     "homework/masalkin/1.2/critique.md",
     "homework/uhanov/1.1/critique.md",
