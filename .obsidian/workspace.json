@@ -13,12 +13,22 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "lesson5/TRANSITION_TO_AGENTS.md",
+                "file": "README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "TRANSITION_TO_AGENTS"
+              "title": "README"
+            }
+          },
+          {
+            "id": "9e7a9f24eff8b969",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "Новая вкладка"
             }
           }
         ]
@@ -190,10 +200,12 @@
   },
   "active": "9eeba055e83f10d3",
   "lastOpenFiles": [
+    "lesson6/PLAN.md",
+    "lesson6",
+    "README.md",
+    "lesson5/TRANSITION_TO_AGENTS.md",
     "lesson5/AGENT_DEVELOPMENT_METHODOLOGY.md",
     "lesson5/TO_AGENTS.md",
-    "lesson5/TRANSITION_TO_AGENTS.md",
-    "README.md",
     "homework/masalkin/1.2/critique.md",
     "homework/uhanov/1.1/critique.md",
     "homework.md",
@@ -217,7 +229,6 @@
     "lesson1/yellow_homework/previews/1.1_pendulum_yellow_1.png",
     "lesson1/yellow_homework/animations/1.3_ensemble.html",
     "lesson1/yellow_homework/animations/1.2_vectors.html",
-    "lesson1/yellow_homework/animations/1.2_ensemble.html",
     "lesson1/yellow_homework/README.md",
     "yellow_homework/README.md"
   ]
