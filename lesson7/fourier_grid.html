@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Дискретные гармоники Фурье</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f8fb;color:#172b43;font:16px/1.5 system-ui,sans-serif}main{max-width:1080px;margin:auto;padding:28px 24px}h1{font-size:28px;line-height:1.2;margin:0 0 10px}p{margin:8px 0 18px;color:#53667b}.controls{display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin:18px 0}label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#53667b}button,select,input{font:inherit}button,select,input[type=number]{padding:8px 12px;border:1px solid #bac9d8;border-radius:6px;background:white;color:#172b43;min-height:42px}button{cursor:pointer}button.primary{background:#1d659b;color:white;border-color:#1d659b}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #e9aa35;outline-offset:3px}input[type=range]{width:100%;min-height:28px;accent-color:#1d659b}.grow{flex:1;min-width:180px}.legend{display:flex;gap:20px;flex-wrap:wrap;font-size:14px}.blue{color:#2464b2}.orange{color:#bf530f}.green{color:#187b68}canvas{display:block;width:100%;height:300px}#mainPlot{touch-action:none;cursor:crosshair}.pair{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px}.pair canvas{height:190px}h2{font-size:16px;margin:8px 0}.chart{background:white;border-radius:8px;padding:8px}.formula{font-family:ui-monospace,monospace;overflow-wrap:anywhere;margin:14px 0;font-size:14px}.status{display:flex;gap:24px;flex-wrap:wrap;margin:12px 0;font-variant-numeric:tabular-nums}details{margin-top:20px;border-top:1px solid #d4deea;padding-top:12px}summary{cursor:pointer}details p{font-size:14px}.small{font-size:13px}#sampleValue{width:110px}@media(max-width:650px){main{padding:18px 12px}h1{font-size:23px}.pair{grid-template-columns:1fr;gap:12px}canvas{height:260px}.controls{gap:10px}.legend{gap:10px}}
+</style>
+<style>
+.harmonics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:14px}.harmonic{min-width:0;background:white;padding:12px;border:2px solid transparent;border-radius:8px}.harmonic.active{border-color:#187b68}.harmonic h3{font-size:15px;margin:0}.harmonic p{font-size:12px;margin:3px 0 6px;font-variant-numeric:tabular-nums}.harmonic canvas{height:160px}.harmonic .state{font-size:12px;color:#187b68;min-height:18px}.harmonic-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}@media(max-width:650px){.harmonics{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Функция как сумма дискретных гармоник</h1>
+<p>Задайте значения на равномерной сетке — выберите пример или нарисуйте профиль мышью. Затем добавляйте гармоники от низких частот к высоким.</p>
+<div class="controls">
+<label>Начальный профиль<select id="preset"><option value="smooth">Смесь волн</option><option value="peak">Узкий пик</option><option value="box">Прямоугольник</option><option value="saw">Пила</option><option value="draw">Свой рисунок</option></select></label>
+<label>Число узлов N<select id="nodes"><option>16</option><option selected>32</option><option>64</option></select></label>
+<button id="play" class="primary">▶ Собрать из гармоник</button>
+<button id="reset">Сначала</button>
+<button id="all">Все гармоники</button>
+</div>
+<div class="controls">
+<label class="grow">Добавленные частоты: <output id="count">0</output><input id="progress" type="range" min="0" max="16" value="0" step="0.01" aria-label="Число добавленных гармоник"></label>
+<label>Скорость<select id="speed"><option value="0.6">Медленно</option><option value="1.2" selected>Обычно</option><option value="3">Быстро</option></select></label>
+</div>
+<div class="legend"><span class="blue">● Значения функции в узлах</span><span class="orange">━ Накопленная сумма</span><span class="green">━ Добавляемая гармоника (ниже)</span></div>
+<div class="chart"><canvas id="mainPlot" aria-label="Значения функции и их восстановление суммой гармоник. Можно нарисовать профиль указателем."></canvas></div>
+<div class="status"><strong id="error"></strong><span id="stage" role="status" aria-live="polite"></span></div>
+<div class="pair">
+<section><h2 id="termTitle">Постоянная составляющая, k = 0</h2><div class="chart"><canvas id="termPlot" aria-label="Текущая гармоника на равномерной сетке"></canvas></div></section>
+<section><h2>Амплитуды гармоник</h2><div class="chart"><canvas id="spectrum" aria-label="Спектр: амплитуды по номеру частоты"></canvas></div></section>
+</div>
+<div class="formula" id="termFormula"></div>
+<div class="controls">
+<span class="small">Точное редактирование узла:</span>
+<label>Номер j<select id="sampleIndex"></select></label>
+<label>Значение uⱼ<input type="number" id="sampleValue" step="0.1" min="-5" max="5"></label>
+<button id="setSample">Изменить</button>
+</div>
+<section aria-labelledby="galleryTitle">
+<h2 id="galleryTitle">Все гармоники по отдельности</h2>
+<p class="small">Каждая частота показана на своей сетке. Сначала рассмотрите базисные синус и косинус, затем переключитесь на их вклад в выбранную функцию. Точки — значения в узлах; линии помогают увидеть форму между ними.</p>
+<div class="controls">
+<label>Что показать<select id="harmonicMode"><option value="basis">Базис: cos и sin, амплитуда 1</option><option value="weighted">Вклады aₖ cos + bₖ sin, общий масштаб</option><option value="normalized">Вклады, каждый в своём масштабе</option></select></label>
+</div>
+<div class="legend" id="harmonicLegend"><span class="blue">━ cos(2πkx)</span><span class="orange">┄ sin(2πkx)</span></div>
+<p class="small" id="harmonicHint"></p>
+<div id="harmonics" class="harmonics"></div>
+</section>
+<details open><summary>Что именно разлагается?</summary>
+<p>Сетка: <b>xⱼ = j/N, j = 0, …, N−1</b>. Точка x = 1 не дублируется: дискретное преобразование Фурье подразумевает периодическое продолжение. При всех N степенях свободы сумма совпадает с любыми заданными значениями <b>в узлах</b> с точностью округления. Между узлами показан тригонометрический интерполянт, а не единственно возможная исходная функция.</p>
+<div class="formula">uⱼ = a₀ + Σ[k=1…N/2−1] {aₖ cos(2πkxⱼ) + bₖ sin(2πkxⱼ)} + aₙ cos(πj), &nbsp; n = N/2</div>
+<p>Для 1 ≤ k &lt; N/2: aₖ = (2/N)Σⱼuⱼ cos(2πkj/N), bₖ = (2/N)Σⱼuⱼ sin(2πkj/N). Постоянная a₀ = (1/N)Σⱼuⱼ. На частоте Найквиста aₙ = (1/N)Σⱼuⱼ(−1)ʲ: её синус в узлах равен нулю. Получаются 1 + 2(N/2−1) + 1 = N независимых коэффициентов.</p>
+<p>Во время анимации текущая гармоника плавно включается с весом w от 0 до 1. Это способ показать сложение, а не эволюция функции во времени. Около скачков возможны колебания между узлами даже при точном восстановлении всех отсчётов.</p>
+</details>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const TAU = 2*Math.PI;
+let N=32, samples=[], coeff=[], position=0, playing=false, lastTime=0, dragging=false, lastDraw=null;
+let chartGeometry=null, announced=-1, displayScale=2;
+let galleryKey='', galleryCards=[];
+
+// Вещественная форма DFT. DC и Найквист не удваиваются.
+function transform(values){
+  const n=values.length, result=[];
+  for(let k=0;k<=n/2;k++){
+    let a=0,b=0;
+    for(let j=0;j<n;j++){a+=values[j]*Math.cos(TAU*k*j/n);b+=values[j]*Math.sin(TAU*k*j/n);}
+    const scale=(k===0||k===n/2)?1/n:2/n;
+    result.push({a:a*scale,b:(k===0||k===n/2)?0:b*scale});
+  }
+  return result;
+}
+function term(k,x){const c=coeff[k];return c.a*Math.cos(TAU*k*x)+c.b*Math.sin(TAU*k*x);}
+function sumAt(x,p=position){
+  let s=term(0,x);
+  for(let k=1;k<coeff.length;k++)s+=Math.max(0,Math.min(1,p-k+1))*term(k,x);
+  return s;
+}
+function stop(){playing=false;$('play').textContent='▶ Собрать из гармоник';}
+function recompute(){coeff=transform(samples);displayScale=Math.max(1.5,1.15*coeff.reduce((s,c)=>s+Math.hypot(c.a,c.b),0));announced=-1;render();}
+function fillPreset(){
+  const mode=$('preset').value;
+  samples=Array.from({length:N},(_,j)=>{
+    const x=j/N;
+    if(mode==='peak')return 1.6*Math.exp(-180*(x-.47)**2)-.3;
+    if(mode==='box')return x>=.25&&x<.65?1.1:-.4;
+    if(mode==='saw')return 1.6*x-.8;
+    if(mode==='draw')return 0;
+    return .2+.75*Math.sin(TAU*x)+.3*Math.cos(3*TAU*x+.6)+.18*Math.sin(7*TAU*x);
+  });
+  position=0;stop();recompute();syncSample();
+}
+function prepare(canvas,low,high){
+  const width=canvas.clientWidth,height=canvas.clientHeight,dpr=window.devicePixelRatio||1;
+  if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){
+    canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
+  }
+  const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
+  const left=48,right=width-14,top=16,bottom=height-32;
+  const X=x=>left+x*(right-left),Y=y=>bottom-(y-low)/(high-low)*(bottom-top);
+  ctx.font='12px system-ui';ctx.lineWidth=1;ctx.textBaseline='middle';
+  for(let i=0;i<=4;i++){
+    const y=low+(high-low)*i/4;
+    ctx.strokeStyle='#e3eaf1';ctx.beginPath();ctx.moveTo(left,Y(y));ctx.lineTo(right,Y(y));ctx.stroke();
+    ctx.fillStyle='#53667b';ctx.textAlign='right';ctx.fillText(y.toFixed(1),left-7,Y(y));
+  }
+  ctx.strokeStyle='#a9bacb';ctx.beginPath();ctx.moveTo(left,Y(0));ctx.lineTo(right,Y(0));ctx.stroke();
+  return {ctx,X,Y,left,right,top,bottom,width,height,low,high};
+}
+function xAxis(g){
+  const {ctx,X,bottom}=g;ctx.textAlign='center';ctx.fillStyle='#53667b';
+  for(let i=0;i<=4;i++)ctx.fillText((i/4).toFixed(2),X(i/4),bottom+17);
+}
+function curve(g,fn,color,width=2){
+  const {ctx,X,Y}=g;ctx.save();ctx.beginPath();ctx.rect(g.left,g.top,g.right-g.left,g.bottom-g.top);ctx.clip();
+  ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();
+  for(let i=0;i<=600;i++){const x=i/600,y=Y(fn(x));if(i===0)ctx.moveTo(X(x),y);else ctx.lineTo(X(x),y);}
+  ctx.stroke();ctx.restore();
+}
+function dots(g,values,color,r=3){
+  const {ctx,X,Y}=g;ctx.fillStyle=color;
+  values.forEach((v,j)=>{ctx.beginPath();ctx.arc(X(j/N),Y(v),r,0,TAU);ctx.fill();});
+}
+function renderHarmonics(){
+  const mode=$('harmonicMode').value;
+  const key=JSON.stringify([N,mode,coeff,$('harmonics').clientWidth]);
+  if(key!==galleryKey){
+    galleryKey=key;
+    const basis=mode==='basis';
+    $('harmonicLegend').innerHTML=basis?'<span class="blue">━ cos(2πkx)</span><span class="orange">┄ sin(2πkx)</span>':'<span class="green">━ aₖ cos(2πkx) + bₖ sin(2πkx)</span>';
+    $('harmonicHint').textContent=basis?'Базис не зависит от выбранной функции. При k = 0 остаётся константа; при k = N/2 синус равен нулю во всех узлах и не входит в дискретный базис.':mode==='normalized'?'Масштаб каждой строки свой: сравнивайте форму, а амплитуду смотрите в подписи. Нулевые вклады не увеличиваются.':'Одинаковый вертикальный масштаб: видны реальные относительные амплитуды вкладов. Показаны полные вклады, независимо от текущего шага анимации.';
+    const shared=Math.max(.1,...coeff.map(c=>Math.hypot(c.a,c.b)))*1.18;
+    galleryCards=coeff.map((c,k)=>{
+      const card=document.createElement('article');card.className='harmonic';
+      const head=document.createElement('div');head.className='harmonic-heading';
+      const title=document.createElement('h3');title.textContent=`k = ${k}${k===0?' · константа':k===N/2?' · Найквист':` · ${k} периодов`}`;
+      const state=document.createElement('span');state.className='state';head.append(title,state);
+      const info=document.createElement('p');const fmt=v=>(Math.abs(v)<1e-12?0:v).toFixed(4);
+      const amplitude=Math.hypot(c.a,c.b);
+      info.textContent=`a = ${fmt(c.a)}; b = ${fmt(c.b)}; амплитуда = ${fmt(amplitude)}`;
+      const canvas=document.createElement('canvas');canvas.setAttribute('aria-label',`Гармоника ${k}: ${basis?'базисные функции':'вклад в разложение'}, амплитуда вклада ${fmt(amplitude)}`);
+      card.append(head,info,canvas);
+      return {card,state,canvas,k,amplitude};
+    });
+    $('harmonics').replaceChildren(...galleryCards.map(row=>row.card));
+    for(const {canvas,k,amplitude} of galleryCards){
+      const scale=basis?1.18:mode==='normalized'?(amplitude<1e-12?1:amplitude*1.18):shared;
+      const g=prepare(canvas,-scale,scale);xAxis(g);
+      // В малых амплитудах подписи должны сохранять значащие цифры.
+      if(!basis&&scale<.1){
+        g.ctx.clearRect(0,0,g.left-2,g.height-30);g.ctx.fillStyle='#53667b';g.ctx.textAlign='right';
+        for(let i=0;i<=4;i++){const y=-scale+2*scale*i/4;g.ctx.fillText(Math.abs(y)<1e-14?'0':y.toExponential(0),g.left-7,g.Y(y));}
+      }
+      if(basis){
+        curve(g,x=>Math.cos(TAU*k*x),'#2464b2');
+        dots(g,Array.from({length:N},(_,j)=>Math.cos(TAU*k*j/N)),'#2464b2',2.5);
+        if(k>0&&k<N/2){
+          g.ctx.setLineDash([5,4]);curve(g,x=>Math.sin(TAU*k*x),'#bf530f');g.ctx.setLineDash([]);
+          dots(g,Array.from({length:N},(_,j)=>Math.sin(TAU*k*j/N)),'#bf530f',2.2);
+        }
+      }else{
+        curve(g,x=>term(k,x),'#187b68',2.3);
+        dots(g,Array.from({length:N},(_,j)=>term(k,j/N)),'#187b68',2.5);
+      }
+    }
+  }
+  for(const row of galleryCards){
+    const active=row.k===Math.ceil(position);
+    row.card.classList.toggle('active',active);
+    row.state.textContent=active?'Текущая частота':row.k<=position?'Добавлена':'Ещё не добавлена';
+  }
+}
+function render(){
+  if(!coeff.length)return;
+  const k=Math.min(N/2,Math.ceil(position)), weight=k===0?1:position-k+1;
+  // Фиксированный масштаб во время сборки; достаточный и для межузловых выбросов.
+  const scale=displayScale;
+  const g=prepare($('mainPlot'),-scale,scale);chartGeometry=g;xAxis(g);
+  const {ctx,X,Y}=g;
+  ctx.strokeStyle='#edf1f6';ctx.lineWidth=1;
+  for(let j=0;j<N;j++){ctx.beginPath();ctx.moveTo(X(j/N),g.top);ctx.lineTo(X(j/N),g.bottom);ctx.stroke();}
+  // Соединяющий пунктир — только ориентир по исходным отсчётам.
+  ctx.strokeStyle='#a9bdd8';ctx.setLineDash([3,4]);ctx.beginPath();
+  samples.forEach((v,j)=>j?ctx.lineTo(X(j/N),Y(v)):ctx.moveTo(X(0),Y(v)));
+  ctx.stroke();ctx.setLineDash([]);
+  curve(g,x=>sumAt(x),'#bf530f',2.5);dots(g,samples,'#2464b2',N>32?2.5:3.5);
+  const tg=prepare($('termPlot'),-scale,scale);xAxis(tg);
+  curve(tg,x=>term(k,x),'#99c7bc',1.5);
+  curve(tg,x=>weight*term(k,x),'#187b68',2.5);
+  dots(tg,Array.from({length:N},(_,j)=>weight*term(k,j/N)),'#187b68',2.5);
+  const amps=coeff.map(c=>Math.hypot(c.a,c.b));
+  const sg=prepare($('spectrum'),0,Math.max(.1,...amps)*1.15);
+  const barWidth=(sg.right-sg.left)/coeff.length;
+  amps.forEach((a,i)=>{
+    const w=i===0?1:Math.max(0,Math.min(1,position-i+1));
+    sg.ctx.fillStyle='#e3eaf1';sg.ctx.fillRect(sg.left+i*barWidth+2,sg.Y(a),Math.max(1,barWidth-4),sg.bottom-sg.Y(a));
+    sg.ctx.fillStyle=i===k?'#187b68':'#bf530f';
+    sg.ctx.fillRect(sg.left+i*barWidth+2,sg.Y(a*w),Math.max(1,barWidth-4),sg.bottom-sg.Y(a*w));
+    if(i%(N>=64?4:2)===0){sg.ctx.fillStyle='#53667b';sg.ctx.textAlign='center';sg.ctx.fillText(String(i),sg.left+(i+.5)*barWidth,sg.bottom+17);}
+  });
+  const error=Math.max(...samples.map((v,j)=>Math.abs(v-sumAt(j/N))));
+  $('error').textContent='Максимальная ошибка в узлах: '+(error<1e-12?'≈ 0':error.toFixed(4));
+  $('count').textContent=position===N/2?`k = 0…${N/2} · все ${N} коэффициентов`:`k = 0…${k} · вес последней ${weight.toFixed(2)}`;
+  $('progress').value=position;
+  $('termTitle').textContent=k===0?'Постоянная составляющая, k = 0':`Гармоника k = ${k}${k===N/2?' · Найквист':''}`;
+  const c=coeff[k],fmt=v=>(Math.abs(v)<5e-5?0:v).toFixed(3);
+  $('termFormula').textContent=k===0?`a₀ = ${fmt(c.a)} — среднее значение отсчётов`:
+    `h${k}(x) = ${fmt(c.a)} cos(2π·${k}·x) ${c.b<0?'−':'+'} ${fmt(Math.abs(c.b))} sin(2π·${k}·x);   вклад в сумму: ${weight.toFixed(2)} × h${k}(x)`;
+  const stage=position===N/2?N:Math.floor(position);
+  if(stage!==announced){$('stage').textContent=position===N/2?'Все отсчёты восстановлены.':`Сборка по частотам: ${Math.floor(position)} из ${N/2}.`;announced=stage;}
+  renderHarmonics();
+}
+function syncSample(){
+  const j=Number($('sampleIndex').value)||0;$('sampleValue').value=samples[j].toFixed(3);
+}
+function setupNodes(){
+  $('progress').max=N/2;
+  $('sampleIndex').replaceChildren(...Array.from({length:N},(_,j)=>{const o=document.createElement('option');o.value=j;o.textContent=`${j} · x=${(j/N).toFixed(3)}`;return o;}));
+}
+$('preset').addEventListener('change',fillPreset);
+$('harmonicMode').addEventListener('change',renderHarmonics);
+$('nodes').addEventListener('change',()=>{
+  const old=samples.slice(),oldN=N;N=Number($('nodes').value);setupNodes();
+  if($('preset').value==='draw'){
+    samples=Array.from({length:N},(_,j)=>{const p=j/N*oldN,a=Math.floor(p),w=p-a;return old[a]*(1-w)+old[(a+1)%oldN]*w;});
+    stop();position=0;recompute();syncSample();
+  }else fillPreset();
+});
+$('progress').addEventListener('input',()=>{stop();position=Number($('progress').value);render();});
+$('play').addEventListener('click',()=>{if(playing){stop();return;}if(position>=N/2)position=0;playing=true;lastTime=0;$('play').textContent='⏸ Пауза';});
+$('reset').addEventListener('click',()=>{stop();position=0;render();});
+$('all').addEventListener('click',()=>{stop();position=N/2;render();});
+$('sampleIndex').addEventListener('change',syncSample);
+$('setSample').addEventListener('click',()=>{
+  if(!$('sampleValue').checkValidity()||$('sampleValue').value===''){$('sampleValue').reportValidity();return;}
+  samples[Number($('sampleIndex').value)]=Number($('sampleValue').value);
+  $('preset').value='draw';stop();position=0;recompute();
+});
+function drawSample(event){
+  const rect=$('mainPlot').getBoundingClientRect(),g=chartGeometry;
+  const x=(event.clientX-rect.left-g.left)/(g.right-g.left);
+  const y=g.high-(event.clientY-rect.top-g.top)/(g.bottom-g.top)*(g.high-g.low);
+  const j=Math.max(0,Math.min(N-1,Math.round(x*N))),v=Math.max(-5,Math.min(5,y));
+  if(lastDraw&&lastDraw.j!==j){
+    const a=Math.min(lastDraw.j,j),b=Math.max(lastDraw.j,j);
+    for(let i=a;i<=b;i++)samples[i]=lastDraw.v+(v-lastDraw.v)*(i-lastDraw.j)/(j-lastDraw.j);
+  }else samples[j]=v;
+  lastDraw={j,v};$('sampleIndex').value=j;coeff=transform(samples);render();syncSample();
+}
+$('mainPlot').addEventListener('pointerdown',e=>{if(e.button!==0)return;dragging=true;lastDraw=null;stop();position=0;$('preset').value='draw';$('mainPlot').setPointerCapture(e.pointerId);drawSample(e);});
+$('mainPlot').addEventListener('pointermove',e=>{if(dragging)drawSample(e);});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('mainPlot').addEventListener(type,()=>{if(dragging){dragging=false;lastDraw=null;recompute();}});
+function frame(time){
+  if(playing){if(lastTime)position=Math.min(N/2,position+Math.min(.1,(time-lastTime)/1000)*Number($('speed').value));lastTime=time;render();if(position>=N/2)stop();}
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',render);
+setupNodes();fillPreset();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
